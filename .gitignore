@@ -73,3 +73,9 @@ Plugins/**/Intermediate/*
 
 # Cache files for the editor to use
 DerivedDataCache/*
+
+# Content: ignore everything except _MyTest, __ExternalActors__, __ExternalObjects__
+Content/*
+!Content/_MyTest/
+!Content/__ExternalActors__/
+!Content/__ExternalObjects__/
