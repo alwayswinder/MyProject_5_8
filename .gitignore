@@ -79,3 +79,5 @@ Content/*
 !Content/_MyTest/
 !Content/__ExternalActors__/
 !Content/__ExternalObjects__/
+ClaudeStart.bat
+CopilotStart.bat
