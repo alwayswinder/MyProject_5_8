@@ -81,3 +81,5 @@ Content/*
 !Content/__ExternalObjects__/
 ClaudeStart.bat
 CopilotStart.bat
+
+/plugins/
