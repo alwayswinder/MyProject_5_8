@@ -91,16 +91,16 @@ public:
 	/** 激活距离 */
 	UPROPERTY(EditAnywhere, Category = "MyNinjaLive|Activation",
 		meta=(EditCondition="bActivatedByPawnProximity", ClampMin=100.0f))
-	float ActivationDistance = 2000.0f;
+	float ActivationDistance = 100000.0f;
 
 	// ---- 仿真分辨率 ----
 	UPROPERTY(EditAnywhere, Category = "MyNinjaLive|Simulation",
-		meta=(ClampMin=64, ClampMax=1024))
-	int32 ResolutionX = 256;
+		meta=(ClampMin=64, ClampMax=4096))
+	int32 ResolutionX = 1600;  // BP CDO (Pool_0: 1600)
 
 	UPROPERTY(EditAnywhere, Category = "MyNinjaLive|Simulation",
-		meta=(ClampMin=64, ClampMax=1024))
-	int32 ResolutionY = 256;
+		meta=(ClampMin=64, ClampMax=4096))
+	int32 ResolutionY = 1600;  // BP CDO (Pool_0: 1600)
 
 	/** 仿真 FPS（0 = 每帧执行） */
 	UPROPERTY(EditAnywhere, Category = "MyNinjaLive|Simulation",
@@ -112,10 +112,27 @@ public:
 		meta=(ClampMin=1, ClampMax=32))
 	int32 PressureIterations = 8;
 
+	// ---- LOD (对齐原版) ----
+	/** LOD1：降低仿真质量 */
+	UPROPERTY(EditAnywhere, Category = "MyNinjaLive|LOD")
+	bool bLOD1_ReduceSimQuality = true;
+
+	/** LOD2：降低采样 FPS */
+	UPROPERTY(EditAnywhere, Category = "MyNinjaLive|LOD")
+	bool bLOD2_ReduceSamplingFPS = true;
+
+	/** LOD 近边界 */
+	UPROPERTY(EditAnywhere, Category = "MyNinjaLive|LOD")
+	float LOD_NearBound = 4000.0f;
+
+	/** LOD 远边界 */
+	UPROPERTY(EditAnywhere, Category = "MyNinjaLive|LOD")
+	float LOD_FarBound = 8000.0f;
+
 	/** 密度消散率/帧 */
 	UPROPERTY(EditAnywhere, Category = "MyNinjaLive|Simulation",
 		meta=(ClampMin=0.0f, ClampMax=1.0f))
-	float Dissipation = 0.995f;
+	float Dissipation = 0.99f;
 
 	// ---- 碰撞检测 ----
 	UPROPERTY(EditAnywhere, Category = "MyNinjaLive|Tracing")
@@ -135,25 +152,66 @@ public:
 		meta=(ClampMin=1.0f))
 	float TraceDistance = 5000.0f;
 
-	/** 每帧最大 LineTrace 数 */
-	UPROPERTY(EditAnywhere, Category = "MyNinjaLive|Tracing",
-		meta=(ClampMin=1, ClampMax=128))
-	int32 MaxLineTracePerFrame = 16;
+	/** 使用自定义追踪源 (对齐原版) */
+	UPROPERTY(EditAnywhere, Category = "MyNinjaLive|Tracing")
+	bool UseCustomTraceSource = true;  // BP CDO (Pool_0: true)
 
-	// ---- 画笔 ----
+	/** 自定义追踪源位置 (相对于 Actor) */
+	UPROPERTY(EditAnywhere, Category = "MyNinjaLive|Tracing")
+	FVector CustomTraceSourcePosition = FVector(200.0f, 200.0f, 5000.0f);  // BP CDO (Pool_0: 200,200,5000)
+
+	// ---- 画笔 (对齐原版 GlobalBrushScale 体系) ----
 	UPROPERTY(EditAnywhere, Category = "MyNinjaLive|Brush",
 		meta=(ClampMin=0.0f))
-	float BrushSize = 0.05f;
+	float GlobalBrushScale = 4.0f;  // BP CDO (Pool_0: 4.0)
 
 	UPROPERTY(EditAnywhere, Category = "MyNinjaLive|Brush",
 		meta=(ClampMin=0.0f))
-	float BrushStrength = 1.0f;
+	float UserInputBrushScale = 1.2f;  // BP CDO (Pool_0: 1.2)
 
+	UPROPERTY(EditAnywhere, Category = "MyNinjaLive|Brush",
+		meta=(ClampMin=0.0f))
+	float BrushVelocityNoiseFreq = 0.1f;
+
+	UPROPERTY(EditAnywhere, Category = "MyNinjaLive|Brush",
+		meta=(ClampMin=0.0f))
+	float DampenBrushBelowThisVelocity = 0.01f;  // BP CDO (Pool_0: 0.01)
+
+	UPROPERTY(EditAnywhere, Category = "MyNinjaLive|Brush")
+	bool BrushScaledByInteractingObjSize = true;  // BP CDO (Pool_0: true)
+
+	/** 画笔速度噪声调节 (对齐原版 AdjustPainter_V2_BrushVeloNoise) */
 	UPROPERTY(EditAnywhere, Category = "MyNinjaLive|Brush",
 		meta=(ClampMin=0.0f, ClampMax=1.0f))
-	float BrushHardness = 0.5f;
+	float AdjustPainter_BrushVeloNoise = 0.5f;  // BP CDO (Pool_0: 0.5)
 
-	/** UV 空间中最大追踪点数量(自动多目标) */
+	// ---- 预设 (对齐原版) ----
+	/** 默认预设 DataTable */
+	UPROPERTY(EditAnywhere, Category = "MyNinjaLive|Preset")
+	TObjectPtr<class UDataTable> DefaultPreset = nullptr;
+
+	/** 预设名称过滤条件 */
+	UPROPERTY(EditAnywhere, Category = "MyNinjaLive|Preset")
+	FString PresetNameFilterCriteria = TEXT("Usecase");
+
+	// ---- 杂项 (对齐原版) ----
+	/** 自动连接内存池 */
+	UPROPERTY(EditAnywhere, Category = "MyNinjaLive|Misc")
+	bool bAutoConnectToMemoryPool = true;  // BP CDO (Pool_0: true)
+
+	/** 仿真区域运动偏移 */
+	UPROPERTY(EditAnywhere, Category = "MyNinjaLive|Misc")
+	float OffsetFromSimAreaMotion = 0.0f;  // BP CDO (Pool_0: 0.0)
+
+	/** 轨迹点连线 */
+	UPROPERTY(EditAnywhere, Category = "MyNinjaLive|Misc")
+	bool bPV2_Connect_TrackpointsWithLines = true;  // BP CDO (Pool_0: true)
+
+	/** 碰撞遮罩纹理 */
+	UPROPERTY(EditAnywhere, Category = "MyNinjaLive|Misc")
+	TObjectPtr<UTexture> CollisionMask = nullptr;
+
+	/** 最大追踪目标数 */
 	UPROPERTY(EditAnywhere, Category = "MyNinjaLive|Brush",
 		meta=(ClampMin=1, ClampMax=16))
 	int32 MaxTargets = 4;
@@ -183,13 +241,29 @@ public:
 	UPROPERTY(EditAnywhere, Category = "MyNinjaLive|Materials")
 	UMaterialInstance* DivergenceMat = nullptr;
 
-	/** 压力求解材质 */
+	/** 压力求解材质 — 初始化步骤 (MI_Pressure_Solver2_Step1) */
 	UPROPERTY(EditAnywhere, Category = "MyNinjaLive|Materials")
 	UMaterialInstance* PressureSolverMat = nullptr;
 
-	/** 显示材质 — 应用到 ExternalRenderTarget 上 */
+	/** 压力求解迭代材质 (MI_Pressure_Solver1) */
+	UPROPERTY(EditAnywhere, Category = "MyNinjaLive|Materials")
+	TObjectPtr<UMaterialInstance> PressureSolverIterMat = nullptr;
+
+	/** 压力梯度修正材质 (MI_Pressure_Solver2_Step2) — 从速度场减去压力梯度 */
+	UPROPERTY(EditAnywhere, Category = "MyNinjaLive|Materials")
+	TObjectPtr<UMaterialInstance> PressureCorrectionMat = nullptr;
+
+	/** 显示材质 — 应用到 ExternalRenderTarget 上（向后兼容） */
 	UPROPERTY(EditAnywhere, Category = "MyNinjaLive|Materials")
 	UMaterialInstance* DisplayMat = nullptr;
+
+	/** 输出材质数组 (对齐原版 OutputMaterials) */
+	UPROPERTY(EditAnywhere, Category = "MyNinjaLive|Materials")
+	TArray<TObjectPtr<UMaterialInstance>> OutputMaterials;
+
+	/** 当前选择的输出材质索引 (对齐原版 OutputMaterialSelected) */
+	UPROPERTY(EditAnywhere, Category = "MyNinjaLive|Materials")
+	int32 OutputMaterialSelected = 0;  // BP CDO (Pool_0: 0)
 
 	// ---- 输出目标 ----
 	/** 外部显示平面（StaticMeshComponent）— 将模拟结果显示在此平面上 */
@@ -203,7 +277,7 @@ public:
 	/** 平面世界空间尺寸 */
 	UPROPERTY(EditAnywhere, Category = "MyNinjaLive|Output",
 		meta=(ClampMin=1.0f))
-	float PlaneWorldSize = 2000.0f;
+	float PlaneWorldSize = 8200.0f;
 
 	/** 是否显示密度场（false=显示速度场） */
 	UPROPERTY(EditAnywhere, Category = "MyNinjaLive|Output")
@@ -260,6 +334,26 @@ public:
 	/** 添加自定义交互 Actor（默认使用 GetPlayerPawn(0)） */
 	UFUNCTION(BlueprintCallable, Category = "MyNinjaLive")
 	void SetCustomInteractionActor(AActor* InActor) { CustomInteractionActor = InActor; }
+
+	/** 重叠交互：添加交互点 (对齐原版 Overlap → CollisionPaint) */
+	UFUNCTION(BlueprintCallable, Category = "MyNinjaLive")
+	void AddInteractionPoint(const FVector2D& UV, const FVector& WorldVelocity);
+
+	/** 重叠交互：添加持续追踪目标（每帧读取位置绘制） */
+	UFUNCTION(BlueprintCallable, Category = "MyNinjaLive")
+	void AddInteractionTarget(AActor* Target);
+
+	/** 重叠交互：移除交互目标 */
+	UFUNCTION(BlueprintCallable, Category = "MyNinjaLive")
+	void RemoveInteractionTarget(AActor* Target);
+
+	/** 激活体积：添加激活目标 */
+	UFUNCTION(BlueprintCallable, Category = "MyNinjaLive")
+	void AddActiveTarget(AActor* Target);
+
+	/** 激活体积：移除激活目标 */
+	UFUNCTION(BlueprintCallable, Category = "MyNinjaLive")
+	void RemoveActiveTarget(AActor* Target);
 
 protected:
 	// =============================================================
@@ -318,7 +412,17 @@ protected:
 	UMaterialInstanceDynamic* MID_PressureSolver;
 
 	UPROPERTY()
+	UMaterialInstanceDynamic* MID_PressureSolverIter;
+
+	UPROPERTY()
 	UMaterialInstanceDynamic* MID_Display;
+
+	/** 真正在 DisplayPlane 上的 MID（用于 StepUpdateDisplay 更新参数） */
+	UPROPERTY()
+	UMaterialInstanceDynamic* MID_ActiveDisplay = nullptr;
+
+	UPROPERTY()
+	UMaterialInstanceDynamic* MID_PressureCorrection;
 
 	// =============================================================
 	// 内部状态
@@ -348,8 +452,37 @@ protected:
 	/** 组件是否已初始化 */
 	bool bInitialized = false;
 
-	/** 玩家是否在激活范围内 */
+	/** 是否通过激活体积检测到 Pawn */
 	bool bPawnInsideBounds = false;
+
+	/** 活跃交互目标列表 */
+	UPROPERTY()
+	TArray<TObjectPtr<AActor>> ActiveInteractionTargets;
+
+	/** 活跃激活目标列表 */
+	UPROPERTY()
+	TArray<TObjectPtr<AActor>> ActiveActivationTargets;
+
+	/** 相机 LineTrace 最后一帧的命中 UV（无命中时 = -1,-1） */
+	FVector2D CameraTraceHitUV = FVector2D(-1.0f, -1.0f);
+
+	/** 相机 LineTrace 最后一帧的命中速度 */
+	FVector CameraTraceHitVelocity = FVector::ZeroVector;
+
+	/** 相机 LineTrace 是否命中 */
+	bool bCameraTraceHit = false;
+
+	/** 当前 LOD 级别（0=全质量, 1=降低质量, 2=降低FPS） */
+	int32 CurrentLODLevel = 0;
+
+	/** 帧计数（用于诊断） */
+	int32 TickFrameCount = 0;
+
+	/** 预设是否已加载 */
+	bool bPresetLoaded = false;
+
+	/** 累积时间 */
+	float AccumulatedTime = 0.0f;
 
 	// =============================================================
 	// 内部函数
@@ -373,7 +506,7 @@ protected:
 	/** 创建内置显示平面 */
 	void CreateDefaultPlane();
 
-	/** 设置显示材质 */
+	/** 设置显示材质 — 存储在 MID_ActiveDisplay 中供后续更新 */
 	void SetupDisplay();
 
 	/** 获取交互 Actor */
@@ -391,20 +524,37 @@ protected:
 	/** 获取追踪起点（相机或 Actor 位置） */
 	void GetTraceSource(FVector& OutStart, FVector& OutEnd) const;
 
+	/** 从玩家相机发射 LineTrace（每帧调用） */
+	void HandleCameraLineTrace(float DeltaTime);
+
 	/** 检查玩家距离 */
 	void CheckPawnProximity();
 
+	/** 根据距离检查并设置 LOD 级别 */
+	void CheckLOD();
+
+	/** 从 DefaultPreset DataTable 加载预设 */
+	void LoadPreset();
+
 	// ---- 仿真管线步骤 ----
+	/** 清除碰撞 RT */
+	void StepCollisionClear();
 	void StepCollisionPainter(const FVector2D& UV, const FVector2D& VelocityEncoded,
 		float DeltaTime, int32 TargetIndex = 0);
 	void StepInjectDensity(const FVector2D& UV, const FVector2D& VelocityEncoded);
 	void StepAdvection(UTextureRenderTarget2D* Src,
 		UTextureRenderTarget2D* DstWrite, float DeltaTime);
 	void StepCompositeGradient(float DeltaTime);
+	/** 以压力场为 VeloPainter 的梯度修正（v -= ∇p） */
+	void StepPressureCorrection();
 	void StepDivergence();
 	void StepPressureSolve();
+	/** 更新显示 — 始终使用 MID_ActiveDisplay */
 	void StepUpdateDisplay();
 
 	/** 全仿真管线 */
 	void RunSimulationPipeline(float DeltaTime);
+
+	/** 检查组件是否应该运行（激活状态） */
+	bool ShouldSimulationRun() const;
 };
