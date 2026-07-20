@@ -116,7 +116,7 @@ public:
 
 	UPROPERTY(EditAnywhere, Category = "Brush",
 		meta=(EditCondition="bOverride_Brush", ClampMin=0.0f))
-	float BrushSize = 0.05f;
+	float BrushSize = 0.15f;  // 15% UV (原 0.05)
 
 	UPROPERTY(EditAnywhere, Category = "Brush",
 		meta=(EditCondition="bOverride_Brush", ClampMin=0.0f))

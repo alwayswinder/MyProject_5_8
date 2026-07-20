@@ -60,7 +60,7 @@ ASimpleFluidActor::ASimpleFluidActor()
 	// 分辨率提升到 512 以获得可见效果；画笔增大
 	ResolutionX = 512;
 	ResolutionY = 512;
-	BrushSize = 0.02f;   // 2% UV 空间 → 512×512 RT 上约 10px 半径
+	BrushSize = 0.15f;   // 15% UV 空间 — 大画刷确保可见 空间 → 512×512 RT 上约 10px 半径
 	Dissipation = 0.99f;  // 密度消散稍慢以便观察
 
 	// --- 激活体积 ---

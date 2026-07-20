@@ -39,8 +39,10 @@ void UMyNinjaLiveComponent::BeginPlay()
 {
 	Super::BeginPlay();
 
+
 	if (bDisableComponent)
 	{
+		UE_LOG(LogTemp, Warning, TEXT("[MyNinjaLiveComponent] bDisableComponent=true, 退出"));
 		SetComponentTickEnabled(false);
 		return;
 	}
@@ -49,23 +51,21 @@ void UMyNinjaLiveComponent::BeginPlay()
 	if (!AdvectionMat || !DivergenceMat || !PressureSolverMat || !CollisionPainterDotMat)
 	{
 		UE_LOG(LogTemp, Error,
-			TEXT("[MyNinjaLiveComponent] 缺少核心管线材质引用！请在细节面板中指定 AdvectionMat, DivergenceMat, PressureSolverMat, CollisionPainterDotMat。"));
+			TEXT("[MyNinjaLiveComponent] 缺少核心管线材质引用！"));
 		SetComponentTickEnabled(false);
 		return;
-	}
-
-	// 以下为可选材质，缺失时仅打印警告，不影响主管线运行
-	if (!CompositeGradientMat)
-	{
-		UE_LOG(LogTemp, Warning,
-			TEXT("[MyNinjaLiveComponent] CompositeGradientMat 未设置，将跳过外力合成步骤。"));
 	}
 
 	if (!DisplayMat)
 	{
 		UE_LOG(LogTemp, Warning,
-			TEXT("[MyNinjaLiveComponent] DisplayMat 未设置，仿真将运行但不会显示到平面。"
-				 "请在细节面板中指定 DisplayMat（例如 MI_DensityBuffer_Red）。"));
+			TEXT("[MyNinjaLiveComponent] DisplayMat=NULL，仿真将运行但平面看不到效果！"));
+	}
+
+	if (!CompositeGradientMat)
+	{
+		UE_LOG(LogTemp, Warning,
+			TEXT("[MyNinjaLiveComponent] CompositeGradientMat=NULL，跳过外力合成。"));
 	}
 
 	// 仿真帧间隔
@@ -80,24 +80,24 @@ void UMyNinjaLiveComponent::BeginPlay()
 
 	// 创建 RT
 	CreateAllRTs();
-
-	// ★ 诊断：填充密度 RT 中间灰度 → 如果显示管线正确工作，平面应变红
-	// 如果看到红色平面 = 显示管线 OK；如果仍是默认贴图 = 显示管线有问题
-	// （确认管线正常后可删除此段代码）
-	{
-		UKismetRenderingLibrary::ClearRenderTarget2D(this, RT_DensityA,
-			FLinearColor(0.3f, 0.0f, 0.0f, 1.0f));  // 30% 密度 → 可见红色
-	}
+	UE_LOG(LogTemp, Log, TEXT("[MyNinjaLiveComponent] RTs created"));
 
 	// 创建动态材质实例
 	if (!CreateDynamicMaterialInstances())
 	{
+		UE_LOG(LogTemp, Error, TEXT("[MyNinjaLiveComponent] CreateDynamicMaterialInstances FAILED"));
 		SetComponentTickEnabled(false);
 		return;
 	}
+	UE_LOG(LogTemp, Log, TEXT("[MyNinjaLiveComponent] MIDs created"));
+
+	// 诊断代码已移除 — 显示管线确认工作正常
+	// 问题已定位：碰撞绘制材质画全屏quad，黑色背景覆盖了RT内容
+	// 解决方案：密度注入需用加法混合，只添加画刷不覆盖背景
 
 	// 设置显示
 	SetupDisplay();
+
 
 	// 初始化多目标数组
 	SimTargets.SetNum(MaxTargets);
@@ -107,9 +107,7 @@ void UMyNinjaLiveComponent::BeginPlay()
 		TraceExcludeActors.AddUnique(Owner);
 
 	bInitialized = true;
-	UE_LOG(LogTemp, Log,
-		TEXT("[MyNinjaLiveComponent] 初始化完成 — %dx%d, 平面尺寸 %.0f"),
-		ResolutionX, ResolutionY, PlaneWorldSize);
+	UE_LOG(LogTemp, Log, TEXT("[MyNinjaLiveComponent] BeginPlay complete"));
 }
 
 // ============================================================================
@@ -263,6 +261,13 @@ bool UMyNinjaLiveComponent::CreateDynamicMaterialInstances()
 	MID_DensityInject         = DensityInjectMat
 		? UMaterialInstanceDynamic::Create(DensityInjectMat, this)
 		: MID_CollisionPainterDot;
+
+		// Density injection uses additive blending: brush accumulates instead of replacing RT
+		if (MID_DensityInject)
+		{
+			MID_DensityInject->BasePropertyOverrides.bOverride_BlendMode = true;
+			MID_DensityInject->BasePropertyOverrides.BlendMode = BLEND_Additive;
+		}
 	MID_Advection             = UMaterialInstanceDynamic::Create(AdvectionMat,             this);
 	MID_CompositeGradient     = CompositeGradientMat
 		? UMaterialInstanceDynamic::Create(CompositeGradientMat, this)
@@ -313,9 +318,28 @@ void UMyNinjaLiveComponent::CreateDefaultPlane()
 // ============================================================================
 void UMyNinjaLiveComponent::SetupDisplay()
 {
+	UE_LOG(LogTemp, Warning, TEXT("[MyNinjaLiveComponent] SetupDisplay — MID_Display=%s, ExternalDisplayPlane=%s, RT_DensityA=%s"),
+		MID_Display ? TEXT("VALID") : TEXT("NULL"),
+		ExternalDisplayPlane ? TEXT("VALID") : TEXT("NULL"),
+		RT_DensityA ? TEXT("VALID") : TEXT("NULL"));
+
 	if (MID_Display && ExternalDisplayPlane)
 	{
 		ExternalDisplayPlane->SetMaterial(0, MID_Display);
+	}
+	else
+	{
+		UE_LOG(LogTemp, Error, TEXT("[MyNinjaLiveComponent] SetupDisplay — FAILED: MID_Display or ExternalDisplayPlane is null"));
+	}
+
+	// ★ 关键：初始化 VelocityDensityBuffer 参数，指向 RT_VelocityA
+	if (MID_Display && RT_VelocityA)
+	{
+		MID_Display->SetTextureParameterValue(TEXT("VelocityDensityBuffer"), RT_VelocityA);
+	}
+	else
+	{
+		UE_LOG(LogTemp, Error, TEXT("[MyNinjaLiveComponent] SetupDisplay — FAILED: cannot set VelocityDensityBuffer"));
 	}
 }
 
@@ -450,7 +474,7 @@ void UMyNinjaLiveComponent::StepCollisionPainter(const FVector2D& UV,
 void UMyNinjaLiveComponent::StepInjectDensity(const FVector2D& UV,
 	const FVector2D& VelocityEncoded)
 {
-	if (!MID_DensityInject || !RT_DensityA) return;
+	if (!MID_DensityInject || !RT_VelocityA) return;
 
 	MID_DensityInject->SetVectorParameterValue(TEXT("Position"),
 		FLinearColor(UV.X, UV.Y, 0.0f, 1.0f));
@@ -460,7 +484,7 @@ void UMyNinjaLiveComponent::StepInjectDensity(const FVector2D& UV,
 	MID_DensityInject->SetScalarParameterValue(TEXT("BrushStrength"), BrushStrength);
 	MID_DensityInject->SetScalarParameterValue(TEXT("BrushHardness"), BrushHardness);
 
-	UKismetRenderingLibrary::DrawMaterialToRenderTarget(this, RT_DensityA,
+		UKismetRenderingLibrary::DrawMaterialToRenderTarget(this, RT_VelocityA,
 		MID_DensityInject);
 }
 
@@ -525,13 +549,13 @@ void UMyNinjaLiveComponent::StepPressureSolve()
 
 void UMyNinjaLiveComponent::StepUpdateDisplay()
 {
-	// 可选步骤：未设置 DisplayMat 时跳过
 	if (!MID_Display)
+	{
 		return;
+	}
 
-	UTextureRenderTarget2D* SourceRT = bShowDensity ? RT_DensityA : RT_VelocityA;
+		UTextureRenderTarget2D* SourceRT = bShowDensity ? RT_VelocityA : RT_VelocityA;  // density in B channel of velocity RT
 
-	// M_NinjaOutput_Basic 材质的纹理参数名为 VelocityDensityBuffer
 	if (RT_External && SourceRT)
 	{
 		MID_Display->SetTextureParameterValue(TEXT("VelocityDensityBuffer"), SourceRT);
@@ -551,57 +575,57 @@ void UMyNinjaLiveComponent::RunSimulationPipeline(float DeltaTime)
 {
 	// 1. 获取交互源
 	AActor* Interactor = GetInteractionActor();
-	if (!Interactor) return;
 
-	// 2. 计算速度
-	FVector PlayerPos = Interactor->GetActorLocation();
-	FVector PlayerVel = (PlayerPos - LastPlayerWorldPos) / DeltaTime;
-	LastPlayerWorldPos = PlayerPos;
-
-	// 3. 清空碰撞 RT
+	// 2. 清空碰撞 RT（每帧重新绘制交互数据）
 	UKismetRenderingLibrary::ClearRenderTarget2D(this, RT_Collision,
 		FLinearColor::Black);
 
-	// 4. 进行 LineTrace（从相机向前发射，用于指向交互）
+	// 3. 玩家交互：追踪 + 密度/碰撞注入
+	if (Interactor)
 	{
-		FVector TraceStart, TraceEnd;
-		GetTraceSource(TraceStart, TraceEnd);
-		FHitResult Hit = PerformLineTrace(TraceStart, TraceEnd);
-		if (Hit.bBlockingHit)
+		FVector PlayerPos = Interactor->GetActorLocation();
+		FVector PlayerVel = (PlayerPos - LastPlayerWorldPos) / DeltaTime;
+		LastPlayerWorldPos = PlayerPos;
+
+		// 相机射线检测
 		{
-			FVector2D HitUV = WorldToSimUV(Hit.Location);
-			FVector2D VeloEncoded = EncodeVelocity(PlayerVel);
-			StepCollisionPainter(HitUV, VeloEncoded, DeltaTime);
+			FVector TraceStart, TraceEnd;
+			GetTraceSource(TraceStart, TraceEnd);
+			FHitResult Hit = PerformLineTrace(TraceStart, TraceEnd);
+			if (Hit.bBlockingHit)
+			{
+				FVector2D HitUV = WorldToSimUV(Hit.Location);
+				FVector2D VeloEncoded = EncodeVelocity(PlayerVel);
+				StepCollisionPainter(HitUV, VeloEncoded, DeltaTime);
+			}
 		}
+
+		// ★ 密度注入到 RT_VelocityA（RG=速度, B=密度）
+		// 加法混合 → 密度累积
+		FVector2D PlayerUV = WorldToSimUV(PlayerPos);
+		FVector2D Velo = EncodeVelocity(PlayerVel);
+		StepInjectDensity(PlayerUV, Velo);
+		StepCollisionPainter(PlayerUV, Velo, DeltaTime);
 	}
 
-	// 5. ★ 始终将玩家位置映射到 UV 并注入密度（行走/站立产生波纹）
-	FVector2D PlayerUV = WorldToSimUV(PlayerPos);
-	FVector2D Velo = EncodeVelocity(PlayerVel);
-	StepInjectDensity(PlayerUV, Velo);
-	StepCollisionPainter(PlayerUV, Velo, DeltaTime);
-
-	// 6. 平流 — 密度
-	StepAdvection(RT_DensityA, RT_DensityB, DeltaTime);
-	SwapRT(RT_DensityA, RT_DensityB);
-
-	// 7. 平流 — 速度（自平流）
-	StepAdvection(RT_VelocityA, RT_VelocityB, DeltaTime);
-	SwapRT(RT_VelocityA, RT_VelocityB);
-
-	// 8. 外力合成（可选 — 当 CompositeGradientMat 未设置时跳过）
+	// 4. 外力合成 — CompositeGradient 从噪声+碰撞生成速度（产生自然流动！）
 	if (MID_CompositeGradient)
 	{
 		StepCompositeGradient(DeltaTime);
 		SwapRT(RT_VelocityA, RT_VelocityB);
 	}
 
-	// 9. 散度计算
+	// 5. 平流 — 同时平流速度(RG)和密度(B)
+	// RT_VelocityA: RG=速度, B=密度 → M_Advection 通过 "Texture" 参数读取
+	StepAdvection(RT_VelocityA, RT_VelocityB, DeltaTime);
+	SwapRT(RT_VelocityA, RT_VelocityB);
+
+	// 6. 散度计算
 	StepDivergence();
 
-	// 10. 压力求解（迭代）
+	// 7. 压力求解（迭代）
 	StepPressureSolve();
 
-	// 11. 更新显示
+	// 8. 更新显示 — 读取 RT_VelocityA（B 通道=密度）
 	StepUpdateDisplay();
 }
