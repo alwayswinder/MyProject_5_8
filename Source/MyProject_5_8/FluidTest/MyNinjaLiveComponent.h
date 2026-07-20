@@ -1,13 +1,22 @@
 // MyNinjaLiveComponent.h
-// C++ 实现 FluidNinjaLive 核心 ActorComponent（与原版 Blueprint 组件不冲突）
+// C++ 重现 FluidNinjaLive 核心 ActorComponent — 对齐 BP 参考管线
 //
-// 提供基于 RenderTarget 的 GPU 流体模拟管线：
-//   碰撞检测(Linetrace) → 碰撞绘制(CollisionPainter)
-//   → 密度注入 → 平流(Advection) → 外力合成(CompositeGradient)
-//   → 散度(Divergence) → 压力求解(PressureSolve) → 显示(Display)
+// GPU 流体模拟管线（正确顺序）：
+//   碰撞绘制(CollisionPainter) → 外力合成(CompositeGradient)
+//   → 平流(Advection) → 散度(Divergence) → 压力求解(PressureSolve)
+//   → 压力梯度修正(PressureCorrection) → 显示(Display)
 //
-// 用法：将本组件附加到任意 Actor，在细节面板中指定 FluidNinjaLive
-// 材质引用和仿真参数即可。
+// RT 通道布局（对齐 BP CoreSim）：
+//   RG = Velocity 场 (X/Y)  |  B = Density 场  |  A = 未使用
+//
+// RT 命名对齐 BP:
+//   RT_Composite          — 外力合成输出 (velocity + collision force)
+//   RT_Advection          — 平流结果 (advected density+velocity)
+//   RT_Painter            — 碰撞绘制缓冲 (collision painter)
+//   RT_PressureDivergence — 压力/散度场
+//   RT_PressureDivergenceTemp — 压力求解迭代临时缓冲
+//   RT_DensityInput       — 密度输入材质 (外部纹理/媒体输入)
+//   RT_Output             — 最终显示输出
 
 #pragma once
 
@@ -70,7 +79,6 @@ class MYPROJECT_5_8_API UMyNinjaLiveComponent : public UActorComponent
 public:
 	UMyNinjaLiveComponent();
 
-	// 初始化与生命周期
 	virtual void BeginPlay() override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 	virtual void TickComponent(float DeltaTime, ELevelTick TickType,
@@ -80,66 +88,86 @@ public:
 	// 公开属性 —— 可在细节面板编辑
 	// =============================================================
 
-	// ---- 开关 ----
+	// ---- 开关 (对齐 BP: DisableComponent, ComponentActivatedByPawnProximity) ----
 	UPROPERTY(EditAnywhere, Category = "MyNinjaLive|Activation")
 	bool bDisableComponent = false;
 
-	/** 基于玩家距离自动激活/休眠 */
 	UPROPERTY(EditAnywhere, Category = "MyNinjaLive|Activation")
-	bool bActivatedByPawnProximity = false;
+	bool bComponentActivatedByPawnProximity = false;
 
-	/** 激活距离 */
+	/** BP TickRateCustom = 0.016 (60fps) */
 	UPROPERTY(EditAnywhere, Category = "MyNinjaLive|Activation",
-		meta=(EditCondition="bActivatedByPawnProximity", ClampMin=100.0f))
-	float ActivationDistance = 100000.0f;
+		meta=(ClampMin=0.0f))
+	float TickRateCustom = 0.016f;
 
-	// ---- 仿真分辨率 ----
+	// ---- 仿真分辨率 (BP 默认 256×256) ----
 	UPROPERTY(EditAnywhere, Category = "MyNinjaLive|Simulation",
 		meta=(ClampMin=64, ClampMax=4096))
-	int32 ResolutionX = 1600;  // BP CDO (Pool_0: 1600)
+	int32 ResolutionX = 256;
 
 	UPROPERTY(EditAnywhere, Category = "MyNinjaLive|Simulation",
 		meta=(ClampMin=64, ClampMax=4096))
-	int32 ResolutionY = 1600;  // BP CDO (Pool_0: 1600)
+	int32 ResolutionY = 256;
 
-	/** 仿真 FPS（0 = 每帧执行） */
+	/** BP MaxSamplingFPS = 60 */
 	UPROPERTY(EditAnywhere, Category = "MyNinjaLive|Simulation",
-		meta=(ClampMin=0, ClampMax=120))
-	int32 SimFPS = 0;
+		meta=(ClampMin=1, ClampMax=120))
+	int32 MaxSamplingFPS = 60;
 
-	/** 压力求解器迭代次数 */
+	/** BP MinSamplingFPS = 30 */
 	UPROPERTY(EditAnywhere, Category = "MyNinjaLive|Simulation",
-		meta=(ClampMin=1, ClampMax=32))
-	int32 PressureIterations = 8;
+		meta=(ClampMin=1, ClampMax=120))
+	int32 MinSamplingFPS = 30;
 
-	// ---- LOD (对齐原版) ----
-	/** LOD1：降低仿真质量 */
-	UPROPERTY(EditAnywhere, Category = "MyNinjaLive|LOD")
-	bool bLOD1_ReduceSimQuality = true;
+	/** BP UsePressureSolver1_(DefaultIs2) = false → 默认用 Solver2 (1次迭代+kernel reduction) */
+	UPROPERTY(EditAnywhere, Category = "MyNinjaLive|Simulation")
+	bool bUsePressureSolver1 = false;
 
-	/** LOD2：降低采样 FPS */
-	UPROPERTY(EditAnywhere, Category = "MyNinjaLive|LOD")
-	bool bLOD2_ReduceSamplingFPS = true;
+	/** BP PressureSolver1_MaxIterations = 5 */
+	UPROPERTY(EditAnywhere, Category = "MyNinjaLive|Simulation",
+		meta=(ClampMin=1, ClampMax=128, EditCondition="bUsePressureSolver1"))
+	int32 PressureSolver1_MaxIterations = 5;
 
-	/** LOD 近边界 */
-	UPROPERTY(EditAnywhere, Category = "MyNinjaLive|LOD")
-	float LOD_NearBound = 4000.0f;
+	/** BP PressureSolver2_MaxIterations = 1 */
+	UPROPERTY(EditAnywhere, Category = "MyNinjaLive|Simulation",
+		meta=(ClampMin=1, ClampMax=32, EditCondition="!bUsePressureSolver1"))
+	int32 PressureSolver2_MaxIterations = 1;
 
-	/** LOD 远边界 */
+	/** BP PressureSolver2_KernelReduction = 1.0 */
+	UPROPERTY(EditAnywhere, Category = "MyNinjaLive|Simulation",
+		meta=(ClampMin=0.1f, ClampMax=10.0f, EditCondition="!bUsePressureSolver1"))
+	float PressureSolver2_KernelReduction = 1.0f;
+
+	// ---- LOD (对齐 BP: false/false, 2000/5000) ----
 	UPROPERTY(EditAnywhere, Category = "MyNinjaLive|LOD")
-	float LOD_FarBound = 8000.0f;
+	bool bLOD1_ReduceSimQuality = false;
+
+	UPROPERTY(EditAnywhere, Category = "MyNinjaLive|LOD")
+	bool bLOD2_ReduceSamplingFPS = false;
+
+	UPROPERTY(EditAnywhere, Category = "MyNinjaLive|LOD")
+	float LOD_NearBound = 2000.0f;
+
+	UPROPERTY(EditAnywhere, Category = "MyNinjaLive|LOD")
+	float LOD_FarBound = 5000.0f;
+
+	UPROPERTY(EditAnywhere, Category = "MyNinjaLive|LOD")
+	int32 LOD_Steps = 5;
+
+	UPROPERTY(EditAnywhere, Category = "MyNinjaLive|LOD")
+	float LOD_StepRange = 300.0f;
 
 	/** 密度消散率/帧 */
 	UPROPERTY(EditAnywhere, Category = "MyNinjaLive|Simulation",
 		meta=(ClampMin=0.0f, ClampMax=1.0f))
 	float Dissipation = 0.99f;
 
-	// ---- 碰撞检测 ----
+	// ---- 碰撞检测 (对齐 BP TraceChannels) ----
 	UPROPERTY(EditAnywhere, Category = "MyNinjaLive|Tracing")
 	TArray<TEnumAsByte<EObjectTypeQuery>> ObjectTypes;
 
 	UPROPERTY(EditAnywhere, Category = "MyNinjaLive|Tracing")
-	TEnumAsByte<ETraceTypeQuery> TraceChannel = TraceTypeQuery1;
+	TEnumAsByte<ETraceTypeQuery> TraceChannel = TraceTypeQuery3;
 
 	UPROPERTY(EditAnywhere, Category = "MyNinjaLive|Tracing")
 	TArray<TEnumAsByte<EObjectTypeQuery>> TraceObjectTypes;
@@ -147,145 +175,227 @@ public:
 	UPROPERTY(EditAnywhere, Category = "MyNinjaLive|Tracing")
 	TArray<AActor*> ActorsToIgnore;
 
-	/** 追踪距离 */
 	UPROPERTY(EditAnywhere, Category = "MyNinjaLive|Tracing",
 		meta=(ClampMin=1.0f))
 	float TraceDistance = 5000.0f;
 
-	/** 使用自定义追踪源 (对齐原版) */
+	/** BP UseCustomTraceSource = false (从玩家相机发射射线) */
 	UPROPERTY(EditAnywhere, Category = "MyNinjaLive|Tracing")
-	bool UseCustomTraceSource = true;  // BP CDO (Pool_0: true)
+	bool UseCustomTraceSource = false;
 
-	/** 自定义追踪源位置 (相对于 Actor) */
+	/** BP CustomTraceSourcePosition = (0,0,5000) */
 	UPROPERTY(EditAnywhere, Category = "MyNinjaLive|Tracing")
-	FVector CustomTraceSourcePosition = FVector(200.0f, 200.0f, 5000.0f);  // BP CDO (Pool_0: 200,200,5000)
+	FVector CustomTraceSourcePosition = FVector(0.0f, 0.0f, 5000.0f);
 
-	// ---- 画笔 (对齐原版 GlobalBrushScale 体系) ----
+	// ---- 画笔 (对齐 BP Brush 体系) ----
+	/** BP GlobalBrushScale = 1.0 */
 	UPROPERTY(EditAnywhere, Category = "MyNinjaLive|Brush",
 		meta=(ClampMin=0.0f))
-	float GlobalBrushScale = 4.0f;  // BP CDO (Pool_0: 4.0)
+	float GlobalBrushScale = 1.0f;
 
+	/** BP UserInputBrushScale = 1.0 */
 	UPROPERTY(EditAnywhere, Category = "MyNinjaLive|Brush",
 		meta=(ClampMin=0.0f))
-	float UserInputBrushScale = 1.2f;  // BP CDO (Pool_0: 1.2)
+	float UserInputBrushScale = 1.0f;
 
+	/** BP BrushSize = 0.1 (通过 SetBrush 设置) */
+	UPROPERTY(EditAnywhere, Category = "MyNinjaLive|Brush",
+		meta=(ClampMin=0.0f))
+	float BrushSize = 0.1f;
+
+	/** BP BrushStrength = 0.5 */
+	UPROPERTY(EditAnywhere, Category = "MyNinjaLive|Brush",
+		meta=(ClampMin=0.0f, ClampMax=1.0f))
+	float BrushStrength = 0.5f;
+
+	/** BP BrushHardness = 0.0 */
+	UPROPERTY(EditAnywhere, Category = "MyNinjaLive|Brush",
+		meta=(ClampMin=0.0f, ClampMax=1.0f))
+	float BrushHardness = 0.0f;
+
+	/** BP AdjustPainter_V2_BrushStrength = 1.4 */
+	UPROPERTY(EditAnywhere, Category = "MyNinjaLive|Brush",
+		meta=(ClampMin=0.0f))
+	float AdjustPainter_V2_BrushStrength = 1.4f;
+
+	/** BP AdjustPainter_V2_BrushVeloNoise = 1.0 */
+	UPROPERTY(EditAnywhere, Category = "MyNinjaLive|Brush",
+		meta=(ClampMin=0.0f, ClampMax=2.0f))
+	float AdjustPainter_V2_BrushVeloNoise = 1.0f;
+
+	/** BP AdjustPainter_V2_EdgeMask = 1.0 */
+	UPROPERTY(EditAnywhere, Category = "MyNinjaLive|Brush",
+		meta=(ClampMin=0.0f, ClampMax=1.0f))
+	float AdjustPainter_V2_EdgeMask = 1.0f;
+
+	/** BP BrushVelocityNoiseFreq = 0.1 */
 	UPROPERTY(EditAnywhere, Category = "MyNinjaLive|Brush",
 		meta=(ClampMin=0.0f))
 	float BrushVelocityNoiseFreq = 0.1f;
 
+	/** BP BrushVelocityNoiseScale = 1.0 */
 	UPROPERTY(EditAnywhere, Category = "MyNinjaLive|Brush",
 		meta=(ClampMin=0.0f))
-	float DampenBrushBelowThisVelocity = 0.01f;  // BP CDO (Pool_0: 0.01)
+	float BrushVelocityNoiseScale = 1.0f;
 
-	UPROPERTY(EditAnywhere, Category = "MyNinjaLive|Brush")
-	bool BrushScaledByInteractingObjSize = true;  // BP CDO (Pool_0: true)
-
-	/** 画笔速度噪声调节 (对齐原版 AdjustPainter_V2_BrushVeloNoise) */
+	/** BP DampenBrushBelowThisVelocity = 0.0 (不阻尼) */
 	UPROPERTY(EditAnywhere, Category = "MyNinjaLive|Brush",
-		meta=(ClampMin=0.0f, ClampMax=1.0f))
-	float AdjustPainter_BrushVeloNoise = 0.5f;  // BP CDO (Pool_0: 0.5)
+		meta=(ClampMin=0.0f))
+	float DampenBrushBelowThisVelocity = 0.0f;
 
-	// ---- 预设 (对齐原版) ----
-	/** 默认预设 DataTable */
+	/** BP BrushVelocityPow = 1.6 */
+	UPROPERTY(EditAnywhere, Category = "MyNinjaLive|Brush",
+		meta=(ClampMin=0.1f, ClampMax=10.0f))
+	float BrushVelocityPow = 1.6f;
+
+	/** BP BrushVelocityClamp = 1.0 */
+	UPROPERTY(EditAnywhere, Category = "MyNinjaLive|Brush",
+		meta=(ClampMin=0.0f))
+	float BrushVelocityClamp = 1.0f;
+
+	/** BP BrushScaledByInteractingObjSize = false */
+	UPROPERTY(EditAnywhere, Category = "MyNinjaLive|Brush")
+	bool BrushScaledByInteractingObjSize = false;
+
+	/** BP BrushScaledInverselyByTraceMeshSize = true */
+	UPROPERTY(EditAnywhere, Category = "MyNinjaLive|Brush")
+	bool BrushScaledInverselyByTraceMeshSize = true;
+
+	/** BP BrushPuncture = 0.1 */
+	UPROPERTY(EditAnywhere, Category = "MyNinjaLive|Brush",
+		meta=(ClampMin=0.0f))
+	float BrushPuncture = 0.1f;
+
+	// ---- 预设 (对齐 BP: DT_NinjaLive_Default, "NinjaLive") ----
 	UPROPERTY(EditAnywhere, Category = "MyNinjaLive|Preset")
 	TObjectPtr<class UDataTable> DefaultPreset = nullptr;
 
-	/** 预设名称过滤条件 */
 	UPROPERTY(EditAnywhere, Category = "MyNinjaLive|Preset")
-	FString PresetNameFilterCriteria = TEXT("Usecase");
+	FName PresetNameFilterCriteria = TEXT("NinjaLive");
 
-	// ---- 杂项 (对齐原版) ----
-	/** 自动连接内存池 */
-	UPROPERTY(EditAnywhere, Category = "MyNinjaLive|Misc")
-	bool bAutoConnectToMemoryPool = true;  // BP CDO (Pool_0: true)
+	/** BP ForceAutoLoadPreset = true */
+	UPROPERTY(EditAnywhere, Category = "MyNinjaLive|Preset")
+	bool bForceAutoLoadPreset = true;
 
-	/** 仿真区域运动偏移 */
+	// ---- 杂项 (对齐 BP) ----
 	UPROPERTY(EditAnywhere, Category = "MyNinjaLive|Misc")
-	float OffsetFromSimAreaMotion = 0.0f;  // BP CDO (Pool_0: 0.0)
+	bool bAutoConnectToMemoryPool = false;
 
-	/** 轨迹点连线 */
 	UPROPERTY(EditAnywhere, Category = "MyNinjaLive|Misc")
-	bool bPV2_Connect_TrackpointsWithLines = true;  // BP CDO (Pool_0: true)
+	float OffsetFromSimAreaMotion = 1.0f;
+
+	/** BP SimEdgeBouncyness = 0.5 */
+	UPROPERTY(EditAnywhere, Category = "MyNinjaLive|Misc",
+		meta=(ClampMin=0.0f, ClampMax=1.0f))
+	float SimEdgeBouncyness = 0.5f;
+
+	/** BP FadeDensityAtSimEdge = 0.0 */
+	UPROPERTY(EditAnywhere, Category = "MyNinjaLive|Misc",
+		meta=(ClampMin=0.0f))
+	float FadeDensityAtSimEdge = 0.0f;
+
+	/** BP EdgeMaskWidth = 0.25 */
+	UPROPERTY(EditAnywhere, Category = "MyNinjaLive|Misc",
+		meta=(ClampMin=0.0f, ClampMax=1.0f))
+	float EdgeMaskWidth = 0.25f;
 
 	/** 碰撞遮罩纹理 */
 	UPROPERTY(EditAnywhere, Category = "MyNinjaLive|Misc")
 	TObjectPtr<UTexture> CollisionMask = nullptr;
 
-	/** 最大追踪目标数 */
 	UPROPERTY(EditAnywhere, Category = "MyNinjaLive|Brush",
 		meta=(ClampMin=1, ClampMax=16))
 	int32 MaxTargets = 4;
 
-	// ---- 材质引用 ----
-	/** 碰撞绘制材质(点模式) — 在细节面板指定 */
+	// ---- PV2 Painter 系统 ----
+	UPROPERTY(EditAnywhere, Category = "MyNinjaLive|PainterV2")
+	bool bUsePAINTER_V2_ToTrackObjects = true;
+
+	UPROPERTY(EditAnywhere, Category = "MyNinjaLive|PainterV2")
+	bool bPV2_Connect_TrackpointsWithLines = false;
+
+	UPROPERTY(EditAnywhere, Category = "MyNinjaLive|PainterV2")
+	bool bPV2_Interpolation = false;
+
+	UPROPERTY(EditAnywhere, Category = "MyNinjaLive|PainterV2")
+	float PV2_LineDrawingFailCooldownTime = 0.01f;
+
+	UPROPERTY(EditAnywhere, Category = "MyNinjaLive|PainterV2")
+	float PV2_StopLineDrawingAboveThisVelocity = 500.0f;
+
+	// ---- CoreSimMaterials (对齐 BP 17 材质) ----
+	UPROPERTY(EditAnywhere, Category = "MyNinjaLive|Materials",
+		meta=(DisplayName="CoreSimMaterials"))
+	TArray<TObjectPtr<UMaterialInstance>> CoreSimMaterials;
+
 	UPROPERTY(EditAnywhere, Category = "MyNinjaLive|Materials")
 	UMaterialInstance* CollisionPainterDotMat = nullptr;
 
-	/** 碰撞绘制材质(线模式) */
 	UPROPERTY(EditAnywhere, Category = "MyNinjaLive|Materials")
 	UMaterialInstance* CollisionPainterLineMat = nullptr;
 
-	/** 密度注入材质（可选，默认复用 CollisionPainterDot） */
 	UPROPERTY(EditAnywhere, Category = "MyNinjaLive|Materials")
-	UMaterialInstance* DensityInjectMat = nullptr;
+	UMaterialInstance* CollisionPainterOffsetMat = nullptr;
 
-	/** 平流材质 */
-	UPROPERTY(EditAnywhere, Category = "MyNinjaLive|Materials")
-	UMaterialInstance* AdvectionMat = nullptr;
-
-	/** 外力合成+梯度材质 */
 	UPROPERTY(EditAnywhere, Category = "MyNinjaLive|Materials")
 	UMaterialInstance* CompositeGradientMat = nullptr;
 
-	/** 散度计算材质 */
+	UPROPERTY(EditAnywhere, Category = "MyNinjaLive|Materials")
+	UMaterialInstance* AdvectionMat = nullptr;
+
 	UPROPERTY(EditAnywhere, Category = "MyNinjaLive|Materials")
 	UMaterialInstance* DivergenceMat = nullptr;
 
-	/** 压力求解材质 — 初始化步骤 (MI_Pressure_Solver2_Step1) */
+	/** MI_Pressure_Solver2_Step1 — 压力初始化 */
 	UPROPERTY(EditAnywhere, Category = "MyNinjaLive|Materials")
-	UMaterialInstance* PressureSolverMat = nullptr;
+	UMaterialInstance* PressureSolverInitMat = nullptr;
 
-	/** 压力求解迭代材质 (MI_Pressure_Solver1) */
+	/** MI_Pressure_Solver1 — Jacobi 迭代 */
 	UPROPERTY(EditAnywhere, Category = "MyNinjaLive|Materials")
-	TObjectPtr<UMaterialInstance> PressureSolverIterMat = nullptr;
+	UMaterialInstance* PressureSolverIterMat = nullptr;
 
-	/** 压力梯度修正材质 (MI_Pressure_Solver2_Step2) — 从速度场减去压力梯度 */
+	/** MI_Pressure_Solver2_Step2 — 压力梯度修正 v -= ∇p */
 	UPROPERTY(EditAnywhere, Category = "MyNinjaLive|Materials")
-	TObjectPtr<UMaterialInstance> PressureCorrectionMat = nullptr;
+	UMaterialInstance* PressureCorrectionMat = nullptr;
 
-	/** 显示材质 — 应用到 ExternalRenderTarget 上（向后兼容） */
+	/** 显示材质 (映射到 DisplayPlane) */
 	UPROPERTY(EditAnywhere, Category = "MyNinjaLive|Materials")
 	UMaterialInstance* DisplayMat = nullptr;
 
-	/** 输出材质数组 (对齐原版 OutputMaterials) */
+	/** 输出材质数组 (对齐 BP OutputMaterials — 9 个) */
 	UPROPERTY(EditAnywhere, Category = "MyNinjaLive|Materials")
 	TArray<TObjectPtr<UMaterialInstance>> OutputMaterials;
 
-	/** 当前选择的输出材质索引 (对齐原版 OutputMaterialSelected) */
+	/** BP OutputMaterialSelected = 1 (默认选第2个: MI_DensityBuffer_Translucent) */
 	UPROPERTY(EditAnywhere, Category = "MyNinjaLive|Materials")
-	int32 OutputMaterialSelected = 0;  // BP CDO (Pool_0: 0)
+	int32 OutputMaterialSelected = 1;
+
+	/** 二级输出材质 */
+	UPROPERTY(EditAnywhere, Category = "MyNinjaLive|Materials")
+	TArray<TObjectPtr<UMaterialInstance>> SecondaryOutputMaterials;
+
+	UPROPERTY(EditAnywhere, Category = "MyNinjaLive|Materials")
+	int32 SecondaryOutputMaterialSelected = 0;
+
+	/** 三级输出材质 */
+	UPROPERTY(EditAnywhere, Category = "MyNinjaLive|Materials")
+	TArray<TObjectPtr<UMaterialInstance>> TertiaryOutputMaterials;
+
+	UPROPERTY(EditAnywhere, Category = "MyNinjaLive|Materials")
+	int32 TertiaryOutputMaterialSelected = 0;
 
 	// ---- 输出目标 ----
-	/** 外部显示平面（StaticMeshComponent）— 将模拟结果显示在此平面上 */
 	UPROPERTY(EditAnywhere, Category = "MyNinjaLive|Output")
 	UStaticMeshComponent* ExternalDisplayPlane = nullptr;
 
-	/** 是否创建内置平面（当 ExternalDisplayPlane 未设置时） */
 	UPROPERTY(EditAnywhere, Category = "MyNinjaLive|Output")
 	bool bCreateDefaultDisplayPlane = true;
 
-	/** 平面世界空间尺寸 */
 	UPROPERTY(EditAnywhere, Category = "MyNinjaLive|Output",
 		meta=(ClampMin=1.0f))
 	float PlaneWorldSize = 8200.0f;
 
-	/** 是否显示密度场（false=显示速度场） */
 	UPROPERTY(EditAnywhere, Category = "MyNinjaLive|Output")
-	bool bShowDensity = true;
-
-	/** 最大编码速度（用于速度材质编码） */
-	UPROPERTY(EditAnywhere, Category = "MyNinjaLive|Output",
-		meta=(ClampMin=1.0f))
 	float MaxVelocity = 500.0f;
 
 	// ---- Debug ----
@@ -293,99 +403,89 @@ public:
 	bool bShowDebugMessages = false;
 
 	UPROPERTY(EditAnywhere, Category = "MyNinjaLive|Debug")
-	float DebugMessageDuration = 5.0f;
+	float DebugMessageDuration = 4.0f;
 
 	// =============================================================
 	// 公开函数
 	// =============================================================
 
-	/** 强制启用组件 */
 	UFUNCTION(BlueprintCallable, Category = "MyNinjaLive")
 	void ForceEnable();
 
-	/** 强制禁用组件 */
 	UFUNCTION(BlueprintCallable, Category = "MyNinjaLive")
 	void ForceDisable();
 
-	/** 重置所有 RenderTarget（清空仿真） */
 	UFUNCTION(BlueprintCallable, Category = "MyNinjaLive")
 	void ResetSimulation();
 
-	/** 设置画笔参数 */
 	UFUNCTION(BlueprintCallable, Category = "MyNinjaLive")
-	void SetBrush(float NewSize, float NewStrength, float NewHardness = 0.5f);
+	void SetBrush(float NewSize, float NewStrength, float NewHardness = 0.0f);
 
-	/** 设置仿真分辨率（需要 ResetSimulation 生效） */
 	UFUNCTION(BlueprintCallable, Category = "MyNinjaLive")
 	void SetResolution(int32 NewX, int32 NewY);
 
-	/** 获取密度 RenderTarget */
+	/** 获取输出 RT (RT_Output) */
 	UFUNCTION(BlueprintCallable, Category = "MyNinjaLive")
-	UTextureRenderTarget2D* GetDensityRT() const { return RT_DensityA; }
+	UTextureRenderTarget2D* GetOutputRT() const { return RT_Output; }
 
-	/** 获取速度 RenderTarget */
+	/** 获取复合 RT (RT_Composite — velocity+density) */
 	UFUNCTION(BlueprintCallable, Category = "MyNinjaLive")
-	UTextureRenderTarget2D* GetVelocityRT() const { return RT_VelocityA; }
+	UTextureRenderTarget2D* GetCompositeRT() const { return RT_Composite; }
 
-	/** 获取外部显示 RT（供外部材质使用） */
+	/** 获取碰撞 RT (RT_Painter) */
 	UFUNCTION(BlueprintCallable, Category = "MyNinjaLive")
-	UTextureRenderTarget2D* GetExternalRT() const { return RT_External; }
+	UTextureRenderTarget2D* GetPainterRT() const { return RT_Painter; }
 
-	/** 添加自定义交互 Actor（默认使用 GetPlayerPawn(0)） */
 	UFUNCTION(BlueprintCallable, Category = "MyNinjaLive")
 	void SetCustomInteractionActor(AActor* InActor) { CustomInteractionActor = InActor; }
 
-	/** 重叠交互：添加交互点 (对齐原版 Overlap → CollisionPaint) */
 	UFUNCTION(BlueprintCallable, Category = "MyNinjaLive")
 	void AddInteractionPoint(const FVector2D& UV, const FVector& WorldVelocity);
 
-	/** 重叠交互：添加持续追踪目标（每帧读取位置绘制） */
 	UFUNCTION(BlueprintCallable, Category = "MyNinjaLive")
 	void AddInteractionTarget(AActor* Target);
 
-	/** 重叠交互：移除交互目标 */
+	/** 世界坐标 → 仿真 UV (公开供 ASimpleFluidActor 使用) */
+	UFUNCTION(BlueprintCallable, Category = "MyNinjaLive")
+	FVector2D WorldToSimUV(const FVector& WorldPos) const;
+
 	UFUNCTION(BlueprintCallable, Category = "MyNinjaLive")
 	void RemoveInteractionTarget(AActor* Target);
 
-	/** 激活体积：添加激活目标 */
 	UFUNCTION(BlueprintCallable, Category = "MyNinjaLive")
 	void AddActiveTarget(AActor* Target);
 
-	/** 激活体积：移除激活目标 */
 	UFUNCTION(BlueprintCallable, Category = "MyNinjaLive")
 	void RemoveActiveTarget(AActor* Target);
 
 protected:
 	// =============================================================
-	// RenderTarget 管理
+	// RenderTarget 管理 (对齐 BP 7 RT 命名)
 	// =============================================================
 	UPROPERTY()
-	UTextureRenderTarget2D* RT_DensityA;
+	UTextureRenderTarget2D* RT_Composite;       // 外力合成输出 (velocity+collision force)
 
 	UPROPERTY()
-	UTextureRenderTarget2D* RT_DensityB;
+	UTextureRenderTarget2D* RT_Advection;       // 平流结果 (advected density+velocity)
 
 	UPROPERTY()
-	UTextureRenderTarget2D* RT_VelocityA;
+	UTextureRenderTarget2D* RT_Painter;          // 碰撞绘制缓冲
 
 	UPROPERTY()
-	UTextureRenderTarget2D* RT_VelocityB;
+	UTextureRenderTarget2D* RT_PressureDivergence;     // 压力/散度场
 
 	UPROPERTY()
-	UTextureRenderTarget2D* RT_Pressure;
+	UTextureRenderTarget2D* RT_PressureDivergenceTemp; // 压力求解迭代临时缓冲
 
 	UPROPERTY()
-	UTextureRenderTarget2D* RT_Divergence;
+	UTextureRenderTarget2D* RT_DensityInput;    // 密度输入材质
 
 	UPROPERTY()
-	UTextureRenderTarget2D* RT_Collision;
+	UTextureRenderTarget2D* RT_Output;           // 最终显示输出
 
+	// 内部双缓冲（不与 BP 直接对应，用于内部管线）
 	UPROPERTY()
-	UTextureRenderTarget2D* RT_External;
-
-	// 附加碰撞 RT（用于多目标）
-	UPROPERTY()
-	UTextureRenderTarget2D* RT_Collision2;
+	UTextureRenderTarget2D* RT_WorkBuffer;       // 工作缓冲
 
 	// =============================================================
 	// 动态材质实例
@@ -397,32 +497,45 @@ protected:
 	UMaterialInstanceDynamic* MID_CollisionPainterLine;
 
 	UPROPERTY()
-	UMaterialInstanceDynamic* MID_DensityInject;
-
-	UPROPERTY()
-	UMaterialInstanceDynamic* MID_Advection;
+	UMaterialInstanceDynamic* MID_CollisionPainterOffset;
 
 	UPROPERTY()
 	UMaterialInstanceDynamic* MID_CompositeGradient;
 
 	UPROPERTY()
+	UMaterialInstanceDynamic* MID_Advection;
+
+	UPROPERTY()
 	UMaterialInstanceDynamic* MID_Divergence;
 
 	UPROPERTY()
-	UMaterialInstanceDynamic* MID_PressureSolver;
+	UMaterialInstanceDynamic* MID_PressureSolverInit;
 
 	UPROPERTY()
 	UMaterialInstanceDynamic* MID_PressureSolverIter;
 
 	UPROPERTY()
+	UMaterialInstanceDynamic* MID_PressureCorrection;
+
+	UPROPERTY()
 	UMaterialInstanceDynamic* MID_Display;
 
-	/** 真正在 DisplayPlane 上的 MID（用于 StepUpdateDisplay 更新参数） */
 	UPROPERTY()
 	UMaterialInstanceDynamic* MID_ActiveDisplay = nullptr;
 
-	UPROPERTY()
-	UMaterialInstanceDynamic* MID_PressureCorrection;
+	/** 预设变量 (对齐 BP PresetMap) */
+	float Preset_VeloStrength = 1.0f;
+	float Preset_VeloOffsetX = 0.0f;
+	float Preset_VeloOffsetY = 0.0f;
+	float Preset_VeloRotate = 0.0f;
+	float Preset_VeloAmpNoise = 1.0f;
+	float Preset_VeloDirNoise = 1.0f;
+	float Preset_Speed = 1.0f;
+	float Preset_Divergence = 1.0f;
+	float Preset_InputFeedback = 0.2f;
+	float Preset_FlowFeedback = 0.5f;
+	float Preset_VeloFromSimAreaMotion = 0.0f;
+	float Preset_VeloFromBrushMotion = 1.0f;
 
 	// =============================================================
 	// 内部状态
@@ -430,131 +543,83 @@ protected:
 	UPROPERTY()
 	AActor* CustomInteractionActor = nullptr;
 
-	/** 内置显示平面（当 ExternalDisplayPlane 未设置时创建） */
 	UPROPERTY()
 	UStaticMeshComponent* DefaultDisplayPlane = nullptr;
 
-	/** 追踪排除列表 */
 	UPROPERTY()
 	TArray<AActor*> TraceExcludeActors;
 
-	/** 多目标信息 */
 	UPROPERTY()
 	TArray<FMySimTargetInfo> SimTargets;
 
-	/** 仿真帧计时 */
+	/** 仿真帧计时 (对齐 BP TickRateCustom) */
 	float SimTimer = 0.0f;
-	float SimInterval = 0.0f;
 
-	/** 上一帧玩家位置 */
-	FVector LastPlayerWorldPos = FVector::ZeroVector;
+	/** LOD 计时 */
+	float LODCheckTimer = 0.0f;
+	float LODCheckFrequency = 0.5f;
 
-	/** 组件是否已初始化 */
-	bool bInitialized = false;
+	UPROPERTY()
+	bool bInitDone = false;
 
-	/** 是否通过激活体积检测到 Pawn */
 	bool bPawnInsideBounds = false;
 
-	/** 活跃交互目标列表 */
 	UPROPERTY()
 	TArray<TObjectPtr<AActor>> ActiveInteractionTargets;
 
-	/** 活跃激活目标列表 */
 	UPROPERTY()
 	TArray<TObjectPtr<AActor>> ActiveActivationTargets;
 
-	/** 相机 LineTrace 最后一帧的命中 UV（无命中时 = -1,-1） */
+	/** 相机 LineTrace 结果 */
 	FVector2D CameraTraceHitUV = FVector2D(-1.0f, -1.0f);
-
-	/** 相机 LineTrace 最后一帧的命中速度 */
 	FVector CameraTraceHitVelocity = FVector::ZeroVector;
-
-	/** 相机 LineTrace 是否命中 */
 	bool bCameraTraceHit = false;
+	FVector2D CameraTraceLastUV = FVector2D(-1.0f, -1.0f);
 
-	/** 当前 LOD 级别（0=全质量, 1=降低质量, 2=降低FPS） */
 	int32 CurrentLODLevel = 0;
-
-	/** 帧计数（用于诊断） */
 	int32 TickFrameCount = 0;
-
-	/** 预设是否已加载 */
 	bool bPresetLoaded = false;
-
-	/** 累积时间 */
 	float AccumulatedTime = 0.0f;
 
 	// =============================================================
 	// 内部函数
 	// =============================================================
 
-	/** 创建 RenderTarget */
 	UTextureRenderTarget2D* CreateRT(const FName& Name, int32 SizeX, int32 SizeY);
 
-	/** 创建所有 RT 并清除 */
 	void CreateAllRTs();
-
-	/** 交换双缓冲 RT */
-	void SwapRT(UTextureRenderTarget2D*& A, UTextureRenderTarget2D*& B);
-
-	/** 清除所有 RT */
 	void ClearAllRTs();
-
-	/** 创建动态材质实例 */
 	bool CreateDynamicMaterialInstances();
-
-	/** 创建内置显示平面 */
 	void CreateDefaultPlane();
-
-	/** 设置显示材质 — 存储在 MID_ActiveDisplay 中供后续更新 */
 	void SetupDisplay();
 
-	/** 获取交互 Actor */
 	AActor* GetInteractionActor() const;
-
-	/** 世界坐标 → 仿真 UV */
-	FVector2D WorldToSimUV(const FVector& WorldPos) const;
-
-	/** 世界速度 → 编码到 0~1（0.5 = 零速度） */
 	FVector2D EncodeVelocity(const FVector& WorldVelocity) const;
 
-	/** 执行 LineTrace，返回命中结果 */
 	FHitResult PerformLineTrace(const FVector& Start, const FVector& End) const;
-
-	/** 获取追踪起点（相机或 Actor 位置） */
 	void GetTraceSource(FVector& OutStart, FVector& OutEnd) const;
-
-	/** 从玩家相机发射 LineTrace（每帧调用） */
 	void HandleCameraLineTrace(float DeltaTime);
-
-	/** 检查玩家距离 */
 	void CheckPawnProximity();
-
-	/** 根据距离检查并设置 LOD 级别 */
-	void CheckLOD();
-
-	/** 从 DefaultPreset DataTable 加载预设 */
+	void CheckLOD(float DeltaTime);
 	void LoadPreset();
 
+	/** 通过 Advection MID 复制 RT (pass-through, Δt=0, dissipation=1) */
+	void CopyRT(UTextureRenderTarget2D* Src, UTextureRenderTarget2D* Dst);
+
 	// ---- 仿真管线步骤 ----
-	/** 清除碰撞 RT */
 	void StepCollisionClear();
 	void StepCollisionPainter(const FVector2D& UV, const FVector2D& VelocityEncoded,
 		float DeltaTime, int32 TargetIndex = 0);
-	void StepInjectDensity(const FVector2D& UV, const FVector2D& VelocityEncoded);
-	void StepAdvection(UTextureRenderTarget2D* Src,
-		UTextureRenderTarget2D* DstWrite, float DeltaTime);
 	void StepCompositeGradient(float DeltaTime);
-	/** 以压力场为 VeloPainter 的梯度修正（v -= ∇p） */
-	void StepPressureCorrection();
+	void StepAdvection(float DeltaTime);
 	void StepDivergence();
 	void StepPressureSolve();
-	/** 更新显示 — 始终使用 MID_ActiveDisplay */
+	void StepPressureCorrection();
+	void StepInjectDensityCanvas(const FVector2D& UV, const FVector2D& VelocityEncoded,
+		float DensityAmount = 1.0f);
 	void StepUpdateDisplay();
 
-	/** 全仿真管线 */
 	void RunSimulationPipeline(float DeltaTime);
-
-	/** 检查组件是否应该运行（激活状态） */
+	void PlayerStepInteraction(float DeltaTime);
 	bool ShouldSimulationRun() const;
 };

@@ -1,5 +1,5 @@
 // MyNinjaLiveComponent.cpp
-// C++ 实现 FluidNinjaLive 核心 ActorComponent
+// C++ 重现 FluidNinjaLive 核心流体仿真管线 — 对齐 BP 参考
 
 #include "MyNinjaLiveComponent.h"
 #include "Components/StaticMeshComponent.h"
@@ -13,6 +13,8 @@
 #include "Kismet/KismetMathLibrary.h"
 #include "Kismet/GameplayStatics.h"
 #include "Materials/MaterialInstanceDynamic.h"
+#include "Materials/MaterialInstance.h"
+#include "Engine/DataTable.h"
 #include "DrawDebugHelpers.h"
 
 // ============================================================================
@@ -26,111 +28,77 @@ UMyNinjaLiveComponent::UMyNinjaLiveComponent()
 
 	// 默认 ObjectTypes：WorldStatic, WorldDynamic, Pawn, PhysicsBody
 	ObjectTypes = {
+		ObjectTypeQuery1,  // WorldStatic
 		ObjectTypeQuery2,  // WorldDynamic
 		ObjectTypeQuery3,  // Pawn
+		ObjectTypeQuery4,  // PhysicsBody
 	};
+
+	// 默认预设 DataTable (对齐 BP DT_NinjaLive_Default)
+	static ConstructorHelpers::FObjectFinder<UDataTable> PresetDT(
+		TEXT("/Game/FluidNinjaLive/Presets/DT_NinjaLive_Default.DT_NinjaLive_Default"));
+	if (PresetDT.Succeeded()) DefaultPreset = PresetDT.Object;
 }
 
 // ============================================================================
-// BeginPlay — 初始化 RT、材质实例、显示平面
+// BeginPlay
 // ============================================================================
 void UMyNinjaLiveComponent::BeginPlay()
 {
 	Super::BeginPlay();
 
-
 	if (bDisableComponent)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("[MyNinjaLiveComponent] bDisableComponent=true, 退出"));
+		UE_LOG(LogTemp, Warning, TEXT("[MyNinjaLiveComponent] Disabled, exiting"));
 		SetComponentTickEnabled(false);
 		return;
 	}
 
-	// 核心管线材质（必须全部设置才能运行仿真）
-	if (!AdvectionMat || !DivergenceMat || !PressureSolverMat || !CollisionPainterDotMat)
+	// 核心管线材质检查
+	if (!AdvectionMat || !DivergenceMat || !PressureSolverInitMat || !CollisionPainterDotMat)
 	{
-		UE_LOG(LogTemp, Error,
-			TEXT("[MyNinjaLiveComponent] 缺少核心管线材质引用！"));
+		UE_LOG(LogTemp, Error, TEXT("[MyNinjaLiveComponent] Missing core materials!"));
 		SetComponentTickEnabled(false);
 		return;
 	}
 
-	if (!DisplayMat)
-	{
-		UE_LOG(LogTemp, Warning,
-			TEXT("[MyNinjaLiveComponent] DisplayMat=NULL，仿真将运行但平面看不到效果！"));
-	}
+	// 日志输出关键材质状态
+	UE_LOG(LogTemp, Log, TEXT("[MyNinjaLiveComponent] === Material Status ==="));
+	UE_LOG(LogTemp, Log, TEXT("  AdvectionMat     = %s"), AdvectionMat ? *AdvectionMat->GetName() : TEXT("NULL"));
+	UE_LOG(LogTemp, Log, TEXT("  CompositeGradient= %s"), CompositeGradientMat ? *CompositeGradientMat->GetName() : TEXT("NULL"));
+	UE_LOG(LogTemp, Log, TEXT("  DivergenceMat    = %s"), DivergenceMat ? *DivergenceMat->GetName() : TEXT("NULL"));
+	UE_LOG(LogTemp, Log, TEXT("  DisplayMat       = %s"), DisplayMat ? *DisplayMat->GetName() : TEXT("NULL"));
+	UE_LOG(LogTemp, Log, TEXT("  Resolution       = %dx%d"), ResolutionX, ResolutionY);
 
-	if (!CompositeGradientMat)
-	{
-		UE_LOG(LogTemp, Warning,
-			TEXT("[MyNinjaLiveComponent] CompositeGradientMat=NULL，跳过外力合成。"));
-	}
-
-	// ★ 诊断：打印所有关键材质状态
-	UE_LOG(LogTemp, Warning, TEXT("[MyNinjaLiveComponent] === Material Status ==="));
-	UE_LOG(LogTemp, Warning, TEXT("[MyNinjaLiveComponent]   DisplayMat       = %s"), DisplayMat ? *DisplayMat->GetName() : TEXT("NULL"));
-	UE_LOG(LogTemp, Warning, TEXT("[MyNinjaLiveComponent]   AdvectionMat     = %s"), AdvectionMat ? *AdvectionMat->GetName() : TEXT("NULL"));
-	UE_LOG(LogTemp, Warning, TEXT("[MyNinjaLiveComponent]   CompositeGradient= %s"), CompositeGradientMat ? *CompositeGradientMat->GetName() : TEXT("NULL"));
-	UE_LOG(LogTemp, Warning, TEXT("[MyNinjaLiveComponent]   ExternalPlane    = %s"), ExternalDisplayPlane ? *ExternalDisplayPlane->GetName() : TEXT("NULL"));
-	UE_LOG(LogTemp, Warning, TEXT("[MyNinjaLiveComponent]   bActivatedByPawn = %d"), bActivatedByPawnProximity);
-	UE_LOG(LogTemp, Warning, TEXT("[MyNinjaLiveComponent]   Resolution       = %dx%d"), ResolutionX, ResolutionY);
-	UE_LOG(LogTemp, Warning, TEXT("[MyNinjaLiveComponent] ========================"));
-
-	// 仿真帧间隔
-	if (SimFPS > 0)
-		SimInterval = 1.0f / static_cast<float>(SimFPS);
-	else
-		SimInterval = 0.0f;
-
-	// 创建内置平面
+	// 创建显示平面
 	if (!ExternalDisplayPlane && bCreateDefaultDisplayPlane)
 		CreateDefaultPlane();
 
 	// 创建 RT
 	CreateAllRTs();
-	UE_LOG(LogTemp, Log, TEXT("[MyNinjaLiveComponent] RTs created"));
 
 	// 创建动态材质实例
 	if (!CreateDynamicMaterialInstances())
 	{
-		UE_LOG(LogTemp, Error, TEXT("[MyNinjaLiveComponent] CreateDynamicMaterialInstances FAILED"));
+		UE_LOG(LogTemp, Error, TEXT("[MyNinjaLiveComponent] MID creation failed"));
 		SetComponentTickEnabled(false);
 		return;
 	}
-	UE_LOG(LogTemp, Log, TEXT("[MyNinjaLiveComponent] MIDs created"));
 
-	// 诊断代码已移除 — 显示管线确认工作正常
-	// 问题已定位：碰撞绘制材质画全屏quad，黑色背景覆盖了RT内容
-	// 解决方案：密度注入需用加法混合，只添加画刷不覆盖背景
-
-	// 设置显示（存储到 MID_ActiveDisplay）
+	// 设置显示
 	SetupDisplay();
 
 	// 加载预设
 	LoadPreset();
 
-	// 初始化多目标数组
+	// 初始化多目标
 	SimTargets.SetNum(MaxTargets);
 
-	// 排除 Owner
-	if (AActor* Owner = GetOwner())
-		TraceExcludeActors.AddUnique(Owner);
+	bInitDone = true;
+	bPawnInsideBounds = true;  // 确保首帧运行
 
-	bInitialized = true;
-
-	// 确保仿真初始帧运行（不受激活状态限制）
-	bPawnInsideBounds = true;
-
-	// ★ 诊断：输出 Actor 位置
-	if (AActor* Owner = GetOwner())
-	{
-		UE_LOG(LogTemp, Warning, TEXT("[MyNinjaLiveComponent] BeginPlay — ActorLocation=%s, PlaneWorldSize=%.0f"),
-			*Owner->GetActorLocation().ToString(), PlaneWorldSize);
-	}
-
-	UE_LOG(LogTemp, Log, TEXT("[MyNinjaLiveComponent] BeginPlay complete — Resolution=%dx%d, PlaneWorldSize=%.0f"),
-		ResolutionX, ResolutionY, PlaneWorldSize);
+	UE_LOG(LogTemp, Log, TEXT("[MyNinjaLiveComponent] BeginPlay complete — %dx%d"),
+		ResolutionX, ResolutionY);
 }
 
 // ============================================================================
@@ -143,58 +111,68 @@ void UMyNinjaLiveComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 }
 
 // ============================================================================
-// TickComponent — 主循环
+// TickComponent
 // ============================================================================
 void UMyNinjaLiveComponent::TickComponent(float DeltaTime, ELevelTick TickType,
 	FActorComponentTickFunction* ThisTickFunction)
 {
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
 
-	if (!bInitialized || bDisableComponent || DeltaTime <= 0.0f)
+	if (!bInitDone || bDisableComponent || DeltaTime <= 0.0f)
 		return;
 
-	// LOD 检测（每帧更新距离判断）
-	CheckLOD();
+	AccumulatedTime += DeltaTime;
 
-	// LOD2：降低采样 FPS
-	if (bLOD2_ReduceSamplingFPS && CurrentLODLevel >= 2)
-	{
-		// 每4帧执行一次
-		static int32 Lod2Counter = 0;
-		Lod2Counter++;
-		if (Lod2Counter % 4 != 0) return;
-	}
-
-	// FPS 限制
-	if (SimInterval > 0.0f)
+	// FPS 限制 (对齐 BP TickRateCustom)
+	if (TickRateCustom > 0.0f)
 	{
 		SimTimer += DeltaTime;
-		if (SimTimer < SimInterval) return;
+		if (SimTimer < TickRateCustom) return;
 		DeltaTime = SimTimer;
 		SimTimer = 0.0f;
 	}
 
-	// 诊断：前10帧输出状态
-	if (TickFrameCount < 10)
+	// LOD 检测
+	CheckLOD(DeltaTime);
+
+	// LOD2: 降低采样 FPS
+	if (bLOD2_ReduceSamplingFPS && CurrentLODLevel >= 2)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("[MyNinjaLiveComponent] Tick frame %d — bPawnInsideBounds=%d, ActiveTargets=%d, LOD=%d"),
-			TickFrameCount, bPawnInsideBounds, ActiveActivationTargets.Num(), CurrentLODLevel);
+		static int32 Lod2Skip = 0;
+		Lod2Skip++;
+		if (Lod2Skip % 4 != 0) return;
 	}
 
 	// 激活检测
-	if (bActivatedByPawnProximity)
+	if (bComponentActivatedByPawnProximity)
 	{
 		ActiveActivationTargets.RemoveAll([](const TObjectPtr<AActor>& Ptr) { return Ptr == nullptr; });
-		if (ActiveActivationTargets.Num() > 0)
+		bPawnInsideBounds = (ActiveActivationTargets.Num() > 0);
+		if (!bPawnInsideBounds) return;
+	}
+
+	// 计算玩家 UV (用作相机交互)
+	{
+		APawn* P = UGameplayStatics::GetPlayerPawn(this, 0);
+		if (P)
 		{
-			bPawnInsideBounds = true;
+			FVector2D UV = WorldToSimUV(P->GetActorLocation());
+			UV.X = FMath::Clamp(UV.X, 0.0f, 1.0f);
+			UV.Y = FMath::Clamp(UV.Y, 0.0f, 1.0f);
+			CameraTraceHitUV = UV;
+			CameraTraceHitVelocity = P->GetVelocity();
+			bCameraTraceHit = (UV.X > 0.001f && UV.X < 0.999f && UV.Y > 0.001f && UV.Y < 0.999f);
+		}
+		else
+		{
+			bCameraTraceHit = false;
 		}
 	}
 
-	// ---- 主仿真管线 ----
-	if (TickFrameCount < 5)
-		UE_LOG(LogTemp, Warning, TEXT("[MyNinjaLiveComponent] Starting simulation pipeline (frame %d)"), TickFrameCount);
+	// 运行仿真管线
 	RunSimulationPipeline(DeltaTime);
+
+	TickFrameCount++;
 }
 
 // ============================================================================
@@ -202,39 +180,26 @@ void UMyNinjaLiveComponent::TickComponent(float DeltaTime, ELevelTick TickType,
 // ============================================================================
 void UMyNinjaLiveComponent::ForceEnable()
 {
-	if (bActivatedByPawnProximity)
-	{
-		CheckPawnProximity();
-		if (!bPawnInsideBounds)
-		{
-			UE_LOG(LogTemp, Warning,
-				TEXT("[MyNinjaLiveComponent] ForceEnable 失败：Pawn 不在激活范围内。"));
-			return;
-		}
-	}
 	bDisableComponent = false;
 	SetComponentTickEnabled(true);
-	UE_LOG(LogTemp, Log, TEXT("[MyNinjaLiveComponent] ForceEnable"));
 }
 
 void UMyNinjaLiveComponent::ForceDisable()
 {
 	bDisableComponent = true;
 	SetComponentTickEnabled(false);
-	UE_LOG(LogTemp, Log, TEXT("[MyNinjaLiveComponent] ForceDisable"));
 }
 
 void UMyNinjaLiveComponent::ResetSimulation()
 {
 	ClearAllRTs();
-	UE_LOG(LogTemp, Log, TEXT("[MyNinjaLiveComponent] 仿真已重置"));
 }
 
 void UMyNinjaLiveComponent::SetBrush(float NewSize, float NewStrength, float NewHardness)
 {
-	GlobalBrushScale = FMath::Clamp(NewSize, 0.001f, 100.0f);
-	UserInputBrushScale = FMath::Max(0.0f, NewStrength);
-	BrushVelocityNoiseFreq = FMath::Clamp(NewHardness, 0.0f, 1.0f);
+	BrushSize = FMath::Clamp(NewSize, 0.001f, 100.0f);
+	BrushStrength = FMath::Max(0.0f, NewStrength);
+	BrushHardness = FMath::Clamp(NewHardness, 0.0f, 1.0f);
 }
 
 void UMyNinjaLiveComponent::SetResolution(int32 NewX, int32 NewY)
@@ -259,25 +224,17 @@ UTextureRenderTarget2D* UMyNinjaLiveComponent::CreateRT(
 
 void UMyNinjaLiveComponent::CreateAllRTs()
 {
-	RT_DensityA   = CreateRT(TEXT("RT_DensityA"),   ResolutionX, ResolutionY);
-	RT_DensityB   = CreateRT(TEXT("RT_DensityB"),   ResolutionX, ResolutionY);
-	RT_VelocityA  = CreateRT(TEXT("RT_VelocityA"),  ResolutionX, ResolutionY);
-	RT_VelocityB  = CreateRT(TEXT("RT_VelocityB"),  ResolutionX, ResolutionY);
-	RT_Pressure   = CreateRT(TEXT("RT_Pressure"),   ResolutionX, ResolutionY);
-	RT_Divergence = CreateRT(TEXT("RT_Divergence"), ResolutionX, ResolutionY);
-	RT_Collision  = CreateRT(TEXT("RT_Collision"),  ResolutionX, ResolutionY);
-	RT_Collision2 = CreateRT(TEXT("RT_Collision2"), ResolutionX, ResolutionY);
-	RT_External   = CreateRT(TEXT("RT_External"),   ResolutionX, ResolutionY);
+	// 对齐 BP 7 个命名 RT + 1 个工作缓冲
+	RT_Composite          = CreateRT(TEXT("RT_Composite"),          ResolutionX, ResolutionY);
+	RT_Advection          = CreateRT(TEXT("RT_Advection"),          ResolutionX, ResolutionY);
+	RT_Painter            = CreateRT(TEXT("RT_Painter"),            ResolutionX, ResolutionY);
+	RT_PressureDivergence = CreateRT(TEXT("RT_PressureDivergence"), ResolutionX, ResolutionY);
+	RT_PressureDivergenceTemp = CreateRT(TEXT("RT_PressureDivergenceTemp"), ResolutionX, ResolutionY);
+	RT_DensityInput       = CreateRT(TEXT("RT_DensityInput"),       ResolutionX, ResolutionY);
+	RT_Output             = CreateRT(TEXT("RT_Output"),             ResolutionX, ResolutionY);
+	RT_WorkBuffer         = CreateRT(TEXT("RT_WorkBuffer"),         ResolutionX, ResolutionY);
 
 	ClearAllRTs();
-}
-
-void UMyNinjaLiveComponent::SwapRT(UTextureRenderTarget2D*& A,
-	UTextureRenderTarget2D*& B)
-{
-	UTextureRenderTarget2D* Tmp = A;
-	A = B;
-	B = Tmp;
 }
 
 void UMyNinjaLiveComponent::ClearAllRTs()
@@ -285,15 +242,14 @@ void UMyNinjaLiveComponent::ClearAllRTs()
 	auto Clear = [this](UTextureRenderTarget2D* RT) {
 		if (RT) UKismetRenderingLibrary::ClearRenderTarget2D(this, RT, FLinearColor::Black);
 	};
-	Clear(RT_DensityA);
-	Clear(RT_DensityB);
-	Clear(RT_VelocityA);
-	Clear(RT_VelocityB);
-	Clear(RT_Pressure);
-	Clear(RT_Divergence);
-	Clear(RT_Collision);
-	Clear(RT_Collision2);
-	Clear(RT_External);
+	Clear(RT_Composite);
+	Clear(RT_Advection);
+	Clear(RT_Painter);
+	Clear(RT_PressureDivergence);
+	Clear(RT_PressureDivergenceTemp);
+	Clear(RT_DensityInput);
+	Clear(RT_Output);
+	Clear(RT_WorkBuffer);
 }
 
 // ============================================================================
@@ -301,53 +257,35 @@ void UMyNinjaLiveComponent::ClearAllRTs()
 // ============================================================================
 bool UMyNinjaLiveComponent::CreateDynamicMaterialInstances()
 {
-	MID_CollisionPainterDot   = UMaterialInstanceDynamic::Create(CollisionPainterDotMat,   this);
-	MID_CollisionPainterLine  = CollisionPainterLineMat
-		? UMaterialInstanceDynamic::Create(CollisionPainterLineMat, this)
-		: nullptr;
-	MID_DensityInject         = DensityInjectMat
-		? UMaterialInstanceDynamic::Create(DensityInjectMat, this)
-		: MID_CollisionPainterDot;
+	// 创建所有 MID
+	MID_CollisionPainterDot  = UMaterialInstanceDynamic::Create(CollisionPainterDotMat,    this);
+	MID_CollisionPainterLine = CollisionPainterLineMat
+		? UMaterialInstanceDynamic::Create(CollisionPainterLineMat, this) : nullptr;
+	MID_CollisionPainterOffset = CollisionPainterOffsetMat
+		? UMaterialInstanceDynamic::Create(CollisionPainterOffsetMat, this) : nullptr;
+	MID_CompositeGradient    = CompositeGradientMat
+		? UMaterialInstanceDynamic::Create(CompositeGradientMat, this) : nullptr;
+	MID_Advection            = UMaterialInstanceDynamic::Create(AdvectionMat,               this);
+	MID_Divergence           = UMaterialInstanceDynamic::Create(DivergenceMat,              this);
+	MID_PressureSolverInit   = PressureSolverInitMat
+		? UMaterialInstanceDynamic::Create(PressureSolverInitMat, this) : nullptr;
+	MID_PressureSolverIter   = PressureSolverIterMat
+		? UMaterialInstanceDynamic::Create(PressureSolverIterMat, this) : nullptr;
+	MID_PressureCorrection   = PressureCorrectionMat
+		? UMaterialInstanceDynamic::Create(PressureCorrectionMat, this) : nullptr;
+	MID_Display              = DisplayMat
+		? UMaterialInstanceDynamic::Create(DisplayMat, this) : nullptr;
 
-	// Density injection uses additive blending: brush accumulates instead of replacing RT
-	if (MID_DensityInject)
+	// 核心材质必须存在
+	if (!MID_CollisionPainterDot || !MID_Advection || !MID_Divergence || !MID_PressureSolverInit)
 	{
-		MID_DensityInject->BasePropertyOverrides.bOverride_BlendMode = true;
-		MID_DensityInject->BasePropertyOverrides.BlendMode = BLEND_Additive;
-	}
-	MID_Advection             = UMaterialInstanceDynamic::Create(AdvectionMat,             this);
-	MID_CompositeGradient     = CompositeGradientMat
-		? UMaterialInstanceDynamic::Create(CompositeGradientMat, this)
-		: nullptr;  // 可选
-	MID_Divergence            = UMaterialInstanceDynamic::Create(DivergenceMat,            this);
-	MID_PressureSolver        = PressureSolverMat
-		? UMaterialInstanceDynamic::Create(PressureSolverMat, this)
-		: nullptr;
-	MID_PressureSolverIter    = PressureSolverIterMat
-		? UMaterialInstanceDynamic::Create(PressureSolverIterMat, this)
-		: MID_PressureSolver;
-	MID_PressureCorrection    = PressureCorrectionMat
-		? UMaterialInstanceDynamic::Create(PressureCorrectionMat, this)
-		: nullptr;
-	MID_Display               = DisplayMat
-		? UMaterialInstanceDynamic::Create(DisplayMat, this)
-		: nullptr;
-
-	if (!MID_CollisionPainterDot || !MID_Advection ||
-		!MID_Divergence || !MID_PressureSolver)
-	{
-		UE_LOG(LogTemp, Error,
-			TEXT("[MyNinjaLiveComponent] 核心动态材质实例创建失败"));
+		UE_LOG(LogTemp, Error, TEXT("[MyNinjaLiveComponent] Core MID creation failed"));
 		return false;
 	}
 
-	// 诊断：打印可选的 MID 创建状态
-	UE_LOG(LogTemp, Log, TEXT("[MyNinjaLiveComponent] MID_PressureCorrection=%s"),
-		MID_PressureCorrection ? TEXT("created") : TEXT("NULL (will use CompositeGradient fallback)"));
-	UE_LOG(LogTemp, Log, TEXT("[MyNinjaLiveComponent] MID_Display=%s"),
-		MID_Display ? TEXT("created") : TEXT("NULL"));
-	UE_LOG(LogTemp, Log, TEXT("[MyNinjaLiveComponent] MID_CompositeGradient=%s"),
-		MID_CompositeGradient ? TEXT("created") : TEXT("NULL"));
+	// 如果 PressureSolverIter 未设置，复用 Init
+	if (!MID_PressureSolverIter)
+		MID_PressureSolverIter = MID_PressureSolverInit;
 
 	return true;
 }
@@ -367,7 +305,6 @@ void UMyNinjaLiveComponent::CreateDefaultPlane()
 		DefaultDisplayPlane->RegisterComponent();
 		DefaultDisplayPlane->SetRelativeScale3D(FVector(5.0f, 5.0f, 1.0f));
 
-		// 使用引擎内置平面网格
 		static ConstructorHelpers::FObjectFinder<UStaticMesh> PlaneMesh(
 			TEXT("/Engine/BasicShapes/Plane.Plane"));
 		if (PlaneMesh.Succeeded())
@@ -378,62 +315,61 @@ void UMyNinjaLiveComponent::CreateDefaultPlane()
 }
 
 // ============================================================================
-// 显示设置 — 设置 Plane 材质并缓存到 MID_ActiveDisplay
+// 显示设置
 // ============================================================================
 void UMyNinjaLiveComponent::SetupDisplay()
 {
 	if (!ExternalDisplayPlane)
 	{
-		UE_LOG(LogTemp, Error, TEXT("[MyNinjaLiveComponent] SetupDisplay — ExternalDisplayPlane is null"));
+		UE_LOG(LogTemp, Error, TEXT("[MyNinjaLiveComponent] SetupDisplay — no display plane"));
 		return;
 	}
 
-	// 选择输出材质：尝试用基础材质 M_NinjaOutput_Basic（绕过 MIC 的静态覆写）
-	UMaterialInstance* BaseMat = DisplayMat;
-
-	// 优先用 M_NinjaOutput_Basic 基础材质（不含静态覆写），确保纹理参数可控
-	UMaterial* BaseOutputMat = LoadObject<UMaterial>(nullptr,
-		TEXT("/Game/FluidNinjaLive/OutputMaterials/BaseMaterials/M_NinjaOutput_Basic.M_NinjaOutput_Basic"));
-	if (BaseOutputMat)
+	// 优先使用 DisplayMat，否则 fallback 到 M_NinjaOutput_Basic
+	if (DisplayMat)
 	{
-		MID_ActiveDisplay = UMaterialInstanceDynamic::Create(BaseOutputMat, this);
-		UE_LOG(LogTemp, Warning, TEXT("[MyNinjaLiveComponent] SetupDisplay — Using base material M_NinjaOutput_Basic"));
-	}
-	else if (BaseMat)
-	{
-		MID_ActiveDisplay = UMaterialInstanceDynamic::Create(BaseMat, this);
-		UE_LOG(LogTemp, Warning, TEXT("[MyNinjaLiveComponent] SetupDisplay — Fallback to '%s'"), *BaseMat->GetName());
+		MID_ActiveDisplay = UMaterialInstanceDynamic::Create(DisplayMat, this);
 	}
 	else
 	{
-		UE_LOG(LogTemp, Error, TEXT("[MyNinjaLiveComponent] SetupDisplay — No display material available"));
-		return;
+		UMaterial* BaseOutput = LoadObject<UMaterial>(nullptr,
+			TEXT("/Game/FluidNinjaLive/OutputMaterials/BaseMaterials/M_NinjaOutput_Basic.M_NinjaOutput_Basic"));
+		if (BaseOutput)
+			MID_ActiveDisplay = UMaterialInstanceDynamic::Create(BaseOutput, this);
+		else
+		{
+			UE_LOG(LogTemp, Error, TEXT("[MyNinjaLiveComponent] No display material available"));
+			return;
+		}
 	}
 
 	ExternalDisplayPlane->SetMaterial(0, MID_ActiveDisplay);
 
-	// 枚举所有纹理参数并绑定 RT_VelocityA
+	// 绑定纹理参数
 	TArray<FMaterialParameterInfo> TexParamInfos;
 	TArray<FGuid> TexParamGuids;
 	MID_ActiveDisplay->GetAllTextureParameterInfo(TexParamInfos, TexParamGuids);
 
-	UE_LOG(LogTemp, Warning, TEXT("[MyNinjaLiveComponent] SetupDisplay — %d texture params found"), TexParamInfos.Num());
-
 	for (const FMaterialParameterInfo& Info : TexParamInfos)
 	{
 		FName ParamName = Info.Name;
-		UTextureRenderTarget2D* TargetRT = RT_VelocityA;
-		if (ParamName == TEXT("VelocityDensityBuffer")) TargetRT = RT_VelocityA;
-		else if (ParamName == TEXT("PaintBuffer")) TargetRT = RT_Collision;
-		else if (ParamName == TEXT("PressureBuffer")) TargetRT = RT_Pressure;
-		else if (ParamName == TEXT("DivergenceBuffer")) TargetRT = RT_Divergence;
-		MID_ActiveDisplay->SetTextureParameterValue(ParamName, TargetRT);
-		UE_LOG(LogTemp, Warning, TEXT("[SetupDisplay] %s = %s"), *ParamName.ToString(), *TargetRT->GetName());
+		UTexture* Target = nullptr;
+		if (ParamName == TEXT("VelocityDensityBuffer") || ParamName == TEXT("Texture"))
+			Target = RT_Output;
+		else if (ParamName == TEXT("PaintBuffer"))
+			Target = RT_Painter;
+		else if (ParamName == TEXT("PressureBuffer"))
+			Target = RT_PressureDivergence;
+		else if (ParamName == TEXT("DivergenceBuffer"))
+			Target = RT_PressureDivergence;
+
+		if (Target)
+			MID_ActiveDisplay->SetTextureParameterValue(ParamName, Target);
 	}
 }
 
 // ============================================================================
-// 交互 Actor 获取
+// 坐标转换
 // ============================================================================
 AActor* UMyNinjaLiveComponent::GetInteractionActor() const
 {
@@ -442,15 +378,10 @@ AActor* UMyNinjaLiveComponent::GetInteractionActor() const
 	return UGameplayStatics::GetPlayerPawn(this, 0);
 }
 
-// ============================================================================
-// 坐标转换
-// ============================================================================
 FVector2D UMyNinjaLiveComponent::WorldToSimUV(const FVector& WorldPos) const
 {
 	if (!GetOwner()) return FVector2D(0.5f, 0.5f);
-
 	FVector Origin = GetOwner()->GetActorLocation();
-	// 对齐原版: OffsetFromSimAreaMotion 在模拟区域运动时偏移 UV 计算
 	FVector OffsetOrigin = Origin + FVector(OffsetFromSimAreaMotion, OffsetFromSimAreaMotion, 0.0f);
 	float Half = PlaneWorldSize * 0.5f;
 	return FVector2D(
@@ -473,7 +404,17 @@ FVector2D UMyNinjaLiveComponent::EncodeVelocity(const FVector& WorldVelocity) co
 // ============================================================================
 void UMyNinjaLiveComponent::GetTraceSource(FVector& OutStart, FVector& OutEnd) const
 {
-	// 优先从玩家相机发射
+	if (UseCustomTraceSource)
+	{
+		if (GetOwner())
+		{
+			FVector OwnerLoc = GetOwner()->GetActorLocation();
+			OutStart = OwnerLoc + CustomTraceSourcePosition;
+			OutEnd = OutStart + FVector(0, 0, -TraceDistance);
+		}
+		return;
+	}
+
 	if (APlayerController* PC = UGameplayStatics::GetPlayerController(this, 0))
 	{
 		FVector CamLoc;
@@ -487,11 +428,6 @@ void UMyNinjaLiveComponent::GetTraceSource(FVector& OutStart, FVector& OutEnd) c
 		OutStart = Interactor->GetActorLocation();
 		OutEnd = OutStart + FVector(0, 0, -TraceDistance);
 	}
-	else
-	{
-		OutStart = FVector::ZeroVector;
-		OutEnd = FVector::ZeroVector;
-	}
 }
 
 FHitResult UMyNinjaLiveComponent::PerformLineTrace(
@@ -502,17 +438,10 @@ FHitResult UMyNinjaLiveComponent::PerformLineTrace(
 	if (ObjectTypes.Num() > 0)
 	{
 		UKismetSystemLibrary::LineTraceSingleForObjects(
-			GetWorld(),
-			Start, End,
-			ObjectTypes,
-			false,
+			GetWorld(), Start, End, ObjectTypes, false,
 			TraceExcludeActors,
 			bShowDebugMessages ? EDrawDebugTrace::ForOneFrame : EDrawDebugTrace::None,
-			Hit,
-			true,
-			FLinearColor::Red,
-			FLinearColor::Green,
-			0.0f);
+			Hit, false, FLinearColor::Red, FLinearColor::Green, 0.0f);
 	}
 	else
 	{
@@ -523,7 +452,7 @@ FHitResult UMyNinjaLiveComponent::PerformLineTrace(
 }
 
 // ============================================================================
-// 玩家距离检测
+// 玩家距离 & LOD
 // ============================================================================
 void UMyNinjaLiveComponent::CheckPawnProximity()
 {
@@ -533,419 +462,487 @@ void UMyNinjaLiveComponent::CheckPawnProximity()
 		bPawnInsideBounds = false;
 		return;
 	}
-
-	float Dist = FVector::Dist(PlayerPawn->GetActorLocation(),
-		GetOwner()->GetActorLocation());
-	bPawnInsideBounds = Dist <= ActivationDistance;
+	float Dist = FVector::Dist(PlayerPawn->GetActorLocation(), GetOwner()->GetActorLocation());
+	bPawnInsideBounds = Dist <= LOD_FarBound * 2.0f;  // 宽松检测
 }
 
-// ============================================================================
-// 仿真管线各步骤
-// ============================================================================
-void UMyNinjaLiveComponent::StepCollisionPainter(const FVector2D& UV,
-	const FVector2D& VelocityEncoded, float DeltaTime, int32 TargetIndex)
+void UMyNinjaLiveComponent::CheckLOD(float DeltaTime)
 {
-	UMaterialInstanceDynamic* MID = MID_CollisionPainterDot;
-	UTextureRenderTarget2D* RT = RT_Collision;
-
-	if (!MID || !RT) return;
-
-	MID->SetVectorParameterValue(TEXT("Position"),
-		FLinearColor(UV.X, UV.Y, 0.0f, 1.0f));
-	MID->SetVectorParameterValue(TEXT("Velocity"),
-		FLinearColor(VelocityEncoded.X, VelocityEncoded.Y, 0.0f, 1.0f));
-	MID->SetScalarParameterValue(TEXT("BrushSize"), GlobalBrushScale * 0.01f * UserInputBrushScale);
-	MID->SetScalarParameterValue(TEXT("BrushStrength"), 1.0f);
-	MID->SetScalarParameterValue(TEXT("BrushHardness"), 0.5f);
-	MID->SetScalarParameterValue(TEXT("DeltaTime"), DeltaTime);
-
-	// 传递画笔噪声参数
-	MID->SetScalarParameterValue(TEXT("BrushVeloNoise"), AdjustPainter_BrushVeloNoise);
-	MID->SetScalarParameterValue(TEXT("VeloNoiseFreq"), BrushVelocityNoiseFreq);
-
-	if (CollisionMask)
-	{
-		MID->SetTextureParameterValue(TEXT("CollisionMask"), CollisionMask);
-	}
-
-	UKismetRenderingLibrary::DrawMaterialToRenderTarget(this, RT, MID);
-}
-
-void UMyNinjaLiveComponent::StepInjectDensity(const FVector2D& UV,
-	const FVector2D& VelocityEncoded)
-{
-	if (!MID_DensityInject || !RT_VelocityA) return;
-
-	MID_DensityInject->SetVectorParameterValue(TEXT("Position"),
-		FLinearColor(UV.X, UV.Y, 0.0f, 1.0f));
-	MID_DensityInject->SetVectorParameterValue(TEXT("Velocity"),
-		FLinearColor(VelocityEncoded.X, VelocityEncoded.Y, 0.0f, 1.0f));
-	MID_DensityInject->SetScalarParameterValue(TEXT("BrushSize"), GlobalBrushScale * 0.01f * UserInputBrushScale);
-	MID_DensityInject->SetScalarParameterValue(TEXT("BrushStrength"), 1.0f);
-	MID_DensityInject->SetScalarParameterValue(TEXT("BrushHardness"), 0.5f);
-	MID_DensityInject->SetScalarParameterValue(TEXT("DeltaTime"), 0.016f);
-
-	if (CollisionMask)
-	{
-		MID_DensityInject->SetTextureParameterValue(TEXT("CollisionMask"), CollisionMask);
-	}
-
-	UKismetRenderingLibrary::DrawMaterialToRenderTarget(this, RT_VelocityA,
-		MID_DensityInject);
-}
-
-void UMyNinjaLiveComponent::StepAdvection(UTextureRenderTarget2D* Src,
-	UTextureRenderTarget2D* DstWrite, float DeltaTime)
-{
-	if (!MID_Advection || !Src || !DstWrite || !RT_VelocityA) return;
-
-	MID_Advection->SetTextureParameterValue(TEXT("Texture"), Src);
-	MID_Advection->SetScalarParameterValue(TEXT("DeltaTime"), DeltaTime);
-	MID_Advection->SetScalarParameterValue(TEXT("Dissipation"), Dissipation);
-
-	// CollisionMask 传递给平流材质（如果材质有此参数，否则静默忽略）
-	if (CollisionMask)
-	{
-		MID_Advection->SetTextureParameterValue(TEXT("CollisionMask"), CollisionMask);
-	}
-
-	UKismetRenderingLibrary::DrawMaterialToRenderTarget(this, DstWrite, MID_Advection);
-}
-
-void UMyNinjaLiveComponent::StepCompositeGradient(float DeltaTime)
-{
-	// 可选步骤：未设置 CompositeGradientMat 时跳过
-	if (!MID_CompositeGradient)
-		return;
-
-	if (!RT_VelocityA || !RT_VelocityB || !RT_Collision)
-		return;
-
-	MID_CompositeGradient->SetTextureParameterValue(TEXT("VeloInputTexture"),
-		RT_VelocityA);
-	MID_CompositeGradient->SetTextureParameterValue(TEXT("VeloPainter"),
-		RT_Collision);
-	MID_CompositeGradient->SetScalarParameterValue(TEXT("DeltaTime"), DeltaTime);
-
-	// 传递画笔噪声参数
-	MID_CompositeGradient->SetScalarParameterValue(TEXT("BrushVeloNoise"),
-		AdjustPainter_BrushVeloNoise);
-	MID_CompositeGradient->SetScalarParameterValue(TEXT("VeloNoiseFreq"),
-		BrushVelocityNoiseFreq);
-
-	UKismetRenderingLibrary::DrawMaterialToRenderTarget(this, RT_VelocityB,
-		MID_CompositeGradient);
-}
-
-void UMyNinjaLiveComponent::StepPressureCorrection()
-{
-	// 目的：v = v - ∇p（减去压力梯度使速度场无散度）
-	// 复用 MI_CompositeAndGradient，将 VeloPainter 设为 RT_Pressure（压力场）
-	// 材质内部将压力场解释为梯度源，从速度场中减去
-	if (!MID_CompositeGradient || !RT_VelocityA || !RT_VelocityB || !RT_Pressure)
-		return;
-
-	MID_CompositeGradient->SetTextureParameterValue(TEXT("VeloInputTexture"),
-		RT_VelocityA);
-	MID_CompositeGradient->SetTextureParameterValue(TEXT("VeloPainter"),
-		RT_Pressure);
-	MID_CompositeGradient->SetScalarParameterValue(TEXT("DeltaTime"), 1.0f);
-
-	UKismetRenderingLibrary::DrawMaterialToRenderTarget(this, RT_VelocityB,
-		MID_CompositeGradient);
-	SwapRT(RT_VelocityA, RT_VelocityB);
-}
-
-void UMyNinjaLiveComponent::StepCollisionClear()
-{
-	if (RT_Collision)
-	{
-		UKismetRenderingLibrary::ClearRenderTarget2D(this, RT_Collision, FLinearColor::Black);
-	}
-}
-
-void UMyNinjaLiveComponent::StepDivergence()
-{
-	if (!MID_Divergence || !RT_VelocityA || !RT_Divergence) return;
-
-	MID_Divergence->SetTextureParameterValue(TEXT("Texture"), RT_VelocityA);
-
-	UKismetRenderingLibrary::DrawMaterialToRenderTarget(this, RT_Divergence,
-		MID_Divergence);
-}
-
-void UMyNinjaLiveComponent::StepPressureSolve()
-{
-	if (!MID_PressureSolver || !RT_Pressure || !RT_Divergence) return;
-
-	// 对齐原版 BP: Step1 = MI_Pressure_Solver2_Step1 初始化
-	UKismetRenderingLibrary::ClearRenderTarget2D(this, RT_Pressure, FLinearColor::Black);
-	MID_PressureSolver->SetTextureParameterValue(TEXT("Divergence"), RT_Divergence);
-	MID_PressureSolver->SetTextureParameterValue(TEXT("Texture"), RT_Pressure);
-	UKismetRenderingLibrary::DrawMaterialToRenderTarget(this, RT_Pressure, MID_PressureSolver);
-
-	// 对齐原版 BP: 迭代 = MI_Pressure_Solver1
-	UMaterialInstanceDynamic* IterSolver = MID_PressureSolverIter ? MID_PressureSolverIter : MID_PressureSolver;
-	for (int32 i = 0; i < PressureIterations; i++)
-	{
-		IterSolver->SetTextureParameterValue(TEXT("Texture"), RT_Pressure);
-		UKismetRenderingLibrary::DrawMaterialToRenderTarget(this, RT_Pressure, IterSolver);
-	}
-
-	UE_LOG(LogTemp, VeryVerbose, TEXT("[MyNinjaLiveComponent] PressureSolve — Step1 + %d iterations"), PressureIterations);
-}
-
-void UMyNinjaLiveComponent::StepUpdateDisplay()
-{
-	if (!MID_ActiveDisplay) return;
-
-	UTextureRenderTarget2D* SourceRT = RT_VelocityA;
-	if (!SourceRT) return;
-
-	// 更新 VelocityDensityBuffer 到最新的 SourceRT（速度+密度数据）
-	MID_ActiveDisplay->SetTextureParameterValue(TEXT("VelocityDensityBuffer"), SourceRT);
-	// 更新 PaintBuffer 到 RT_Collision（碰撞力数据）
-	if (RT_Collision)
-		MID_ActiveDisplay->SetTextureParameterValue(TEXT("PaintBuffer"), RT_Collision);
-
-	if (RT_External && MID_Display)
-	{
-		MID_Display->SetTextureParameterValue(TEXT("VelocityDensityBuffer"), SourceRT);
-		UKismetRenderingLibrary::DrawMaterialToRenderTarget(this, RT_External, MID_Display);
-	}
-}
-
-// ============================================================================
-// 全仿真管线
-// ============================================================================
-void UMyNinjaLiveComponent::RunSimulationPipeline(float DeltaTime)
-{
-	TickFrameCount++;
-	AccumulatedTime += DeltaTime;
-
-	// ===== M-fM-^PM-bM-^NM-^QM-eM-$M-^KM-uM-^M-^Y: M-dM-^AM-^MM-eM-^OM-^AM-^AM-^IM-eM-^M-^MM-^G M-eM-^AM-^Q Canvas M-gM-^[M-^AM-^MM-^G M-eM-^OM-^AM-^MM-^G M-fM-^AM-^MM-^G RT M-mM-8M-^AM-^C Canvas ^I^TM-^IM-gM-^PM-^OM-^M-^E M-fM-^LM-^OM-^MM-^A M-^TM-^AM-^MM-^HM-^M-^H)
-
-	if (TickFrameCount <= 3)
-	{
-
-		UTexture2D* WhiteTex = LoadObject<UTexture2D>(nullptr,
-
-	TEXT("/Engine/EngineResources/WhiteSquareTexture.WhiteSquareTexture"));
-
-		UCanvas* Canvas = nullptr;
-
-		FVector2D CanvasSize = FVector2D((float)ResolutionX, (float)ResolutionY);
-
-		FDrawToRenderTargetContext Context;
-
-		UKismetRenderingLibrary::BeginDrawCanvasToRenderTarget(
-			this, RT_VelocityA, Canvas, CanvasSize, Context);
-		if (Canvas && WhiteTex)
-		{
-			for (int32 i = 0; i < 5; i++)
-			{
-				float Phase = (float)i * 1.256f + AccumulatedTime * 0.5f;
-				float NormX = 0.5f + FMath::Sin(Phase * 0.7f) * 0.35f;
-				float NormY = 0.5f + FMath::Cos(Phase * 0.5f) * 0.35f;
-				float Size = CanvasSize.X * 0.04f;
-				FVector2D Pos(NormX * CanvasSize.X - Size * 0.5f,
-							  NormY * CanvasSize.Y - Size * 0.5f);
-				Canvas->K2_DrawTexture(WhiteTex, Pos, FVector2D(Size, Size),
-					FVector2D(0, 0), FVector2D(1, 1), FLinearColor::White,
-					BLEND_Additive);
-			}
-		}
-		UKismetRenderingLibrary::EndDrawCanvasToRenderTarget(this, Context);
-
-		StepUpdateDisplay();
-
-		if (TickFrameCount == 3)
-
-			UE_LOG(LogTemp, Warning, TEXT("[MyNinjaLiveComponent] Seed frames complete"));
-
-		return;
-	}
-	// ===== 1. 清除碰撞 RT =====
-	StepCollisionClear();
-		// ===== 1.5 M-eM-^AM-^QM-gM-^KM-^MM-^AM-^M M-mM-^MM-^KM-^FM-^MM-^A: Canvas M-mM-^AM-^MM-^IM-^BM-^AM-^M M-eM-^EM-^SM-^MM-^AM-^M M-cM-^TM-^EM-^IM-^LM-^HM-^EM-^M-^M M-eM-^LM-^M-^MM-^A M-mM-^IM-^LM-^AM-^M M-eM-^MM-^TM-^AM-^M M-vM-^AM-^MM-=
-
-		UTexture2D* WhiteTex = LoadObject<UTexture2D>(nullptr,
-
-			TEXT("/Engine/EngineResources/WhiteSquareTexture.WhiteSquareTexture"));
-
-		UCanvas* Canvas = nullptr;
-
-		FVector2D CanvasSize = FVector2D((float)ResolutionX, (float)ResolutionY);
-
-		FDrawToRenderTargetContext Context;
-
-		UKismetRenderingLibrary::BeginDrawCanvasToRenderTarget(
-
-			this, RT_VelocityA, Canvas, CanvasSize, Context);
-
-		if (Canvas && WhiteTex)
-
-		{
-
-			for (int32 i = 0; i < 8; i++)
-
-			{
-
-				float Phase = (float)i * 0.785f + AccumulatedTime * 0.5f;
-
-				float NormX = 0.5f + FMath::Sin(Phase * 0.7f) * 0.4f;
-
-				float NormY = 0.5f + FMath::Cos(Phase * 0.5f) * 0.4f;
-
-				float Size = CanvasSize.X * 0.03f;
-
-				FVector2D Pos(NormX * CanvasSize.X - Size * 0.5f,
-
-							  NormY * CanvasSize.Y - Size * 0.5f);
-
-				Canvas->K2_DrawTexture(WhiteTex, Pos, FVector2D(Size, Size),
-
-					FVector2D(0, 0), FVector2D(1, 1), FLinearColor::White,
-
-					BLEND_Additive);
-
-			}
-
-		}
-
-		UKismetRenderingLibrary::EndDrawCanvasToRenderTarget(this, Context);
-		StepUpdateDisplay();
-		return;
-	}
-// 相机 LineTrace 交互
-// ============================================================================
-void UMyNinjaLiveComponent::HandleCameraLineTrace(float DeltaTime)
-{
-	if (UseCustomTraceSource) return;
-	FVector TraceStart, TraceEnd;
-	GetTraceSource(TraceStart, TraceEnd);
-	if (TraceStart.IsZero() && TraceEnd.IsZero())
-	{
-		bCameraTraceHit = false;
-		return;
-	}
-	FHitResult Hit = PerformLineTrace(TraceStart, TraceEnd);
-	bCameraTraceHit = Hit.bBlockingHit;
-	if (bCameraTraceHit)
-	{
-		CameraTraceHitUV = WorldToSimUV(Hit.Location);
-		CameraTraceHitVelocity = FVector::ZeroVector;
-		if (AActor* HitActor = Hit.GetActor())
-		{
-			CameraTraceHitVelocity = HitActor->GetVelocity();
-		}
-		FVector2D VelEnc = EncodeVelocity(CameraTraceHitVelocity);
-		StepCollisionPainter(CameraTraceHitUV, VelEnc, DeltaTime);
-		AddInteractionPoint(CameraTraceHitUV, CameraTraceHitVelocity);
-	}
-}
-// ============================================================================
-// LOD 检测
-// ============================================================================
-void UMyNinjaLiveComponent::CheckLOD()
-{
-	if (!bActivatedByPawnProximity)
+	LODCheckTimer += DeltaTime;
+	if (LODCheckTimer < LODCheckFrequency) return;
+	LODCheckTimer = 0.0f;
+
+	if (!bComponentActivatedByPawnProximity)
 	{
 		CurrentLODLevel = 0;
 		return;
 	}
+
 	APawn* PlayerPawn = UGameplayStatics::GetPlayerPawn(this, 0);
 	if (!PlayerPawn || !GetOwner())
 	{
-		CurrentLODLevel = 2;
+		CurrentLODLevel = LOD_Steps;
 		return;
 	}
+
 	float Dist = FVector::Dist(PlayerPawn->GetActorLocation(), GetOwner()->GetActorLocation());
-	if (Dist < LOD_NearBound)
-		CurrentLODLevel = 0;
-	else if (Dist < LOD_FarBound)
-		CurrentLODLevel = 1;
-	else
-		CurrentLODLevel = 2;
+
+	if (Dist < LOD_NearBound) CurrentLODLevel = 0;
+	else if (Dist < LOD_FarBound) CurrentLODLevel = 1;
+	else CurrentLODLevel = FMath::Min(LOD_Steps, 2 + FMath::FloorToInt((Dist - LOD_FarBound) / LOD_StepRange));
 }
+
 // ============================================================================
 // 预设加载
 // ============================================================================
 void UMyNinjaLiveComponent::LoadPreset()
 {
-	if (!DefaultPreset)
+	if (!DefaultPreset || !bForceAutoLoadPreset)
 	{
-		UE_LOG(LogTemp, Log, TEXT("[MyNinjaLiveComponent] No DefaultPreset assigned, skipping preset load"));
+		UE_LOG(LogTemp, Log, TEXT("[MyNinjaLiveComponent] Preset: not loaded (DT=%s, Force=%d)"),
+			DefaultPreset ? *DefaultPreset->GetName() : TEXT("NULL"), bForceAutoLoadPreset);
 		return;
 	}
-	UE_LOG(LogTemp, Warning, TEXT("[MyNinjaLiveComponent] Preset DataTable assigned: %s (criteria: %s)"),
-		*DefaultPreset->GetName(), *PresetNameFilterCriteria);
+
+	UE_LOG(LogTemp, Log, TEXT("[MyNinjaLiveComponent] Loading preset from %s (filter: %s)"),
+		*DefaultPreset->GetName(), *PresetNameFilterCriteria.ToString());
 	bPresetLoaded = true;
 }
+
+// ============================================================================
+// 仿真管线步骤
+// ============================================================================
+
+// --------------------------------------------------------------------------
+// Step 0: 清除碰撞 RT
+// --------------------------------------------------------------------------
+void UMyNinjaLiveComponent::StepCollisionClear()
+{
+	if (RT_Painter)
+		UKismetRenderingLibrary::ClearRenderTarget2D(this, RT_Painter, FLinearColor::Black);
+}
+
+// --------------------------------------------------------------------------
+// Step 1: 碰撞绘制 — 将交互数据画到 RT_Painter
+//   材质参数：Position, Velocity, BrushSize, BrushStrength, etc.
+// --------------------------------------------------------------------------
+void UMyNinjaLiveComponent::StepCollisionPainter(const FVector2D& UV,
+	const FVector2D& VelocityEncoded, float DeltaTime, int32 TargetIndex)
+{
+	if (!MID_CollisionPainterDot || !RT_Painter) return;
+
+	const float EffectiveBrushSize = BrushSize * GlobalBrushScale * UserInputBrushScale;
+
+	MID_CollisionPainterDot->SetVectorParameterValue(TEXT("Position"),
+		FLinearColor(UV.X, UV.Y, 0.0f, 1.0f));
+	MID_CollisionPainterDot->SetVectorParameterValue(TEXT("Velocity"),
+		FLinearColor(VelocityEncoded.X, VelocityEncoded.Y, 0.0f, 1.0f));
+	MID_CollisionPainterDot->SetScalarParameterValue(TEXT("BrushSize"), EffectiveBrushSize);
+	MID_CollisionPainterDot->SetScalarParameterValue(TEXT("BrushStrength"), BrushStrength);
+	MID_CollisionPainterDot->SetScalarParameterValue(TEXT("BrushHardness"), BrushHardness);
+	MID_CollisionPainterDot->SetScalarParameterValue(TEXT("DeltaTime"), DeltaTime);
+	MID_CollisionPainterDot->SetScalarParameterValue(TEXT("BrushVeloNoise"), AdjustPainter_V2_BrushVeloNoise);
+	MID_CollisionPainterDot->SetScalarParameterValue(TEXT("VeloNoiseFreq"), BrushVelocityNoiseFreq);
+
+	if (CollisionMask)
+		MID_CollisionPainterDot->SetTextureParameterValue(TEXT("CollisionMask"), CollisionMask);
+
+	UKismetRenderingLibrary::DrawMaterialToRenderTarget(this, RT_Painter, MID_CollisionPainterDot);
+}
+
+// --------------------------------------------------------------------------
+// Step 2: 外力合成 — 将碰撞力合并到速度场
+//   CompositeGradient: RT_Composite(vel+density) + RT_Painter(forces)
+//   → RT_WorkBuffer (new vel+density with forces applied)
+// --------------------------------------------------------------------------
+void UMyNinjaLiveComponent::StepCompositeGradient(float DeltaTime)
+{
+	if (!MID_CompositeGradient || !RT_Composite || !RT_Painter || !RT_WorkBuffer) return;
+
+	MID_CompositeGradient->SetTextureParameterValue(TEXT("VeloInputTexture"), RT_Composite);
+	MID_CompositeGradient->SetTextureParameterValue(TEXT("VeloPainter"), RT_Painter);
+	MID_CompositeGradient->SetScalarParameterValue(TEXT("DeltaTime"), DeltaTime);
+	MID_CompositeGradient->SetScalarParameterValue(TEXT("BrushVeloNoise"), AdjustPainter_V2_BrushVeloNoise);
+	MID_CompositeGradient->SetScalarParameterValue(TEXT("VeloNoiseFreq"), BrushVelocityNoiseFreq);
+
+	UKismetRenderingLibrary::DrawMaterialToRenderTarget(this, RT_WorkBuffer, MID_CompositeGradient);
+}
+
+// --------------------------------------------------------------------------
+// Step 3: 平流 — 沿速度场平流密度+速度
+//   Advection: RT_Composite → RT_Advection (advected)
+// --------------------------------------------------------------------------
+void UMyNinjaLiveComponent::StepAdvection(float DeltaTime)
+{
+	if (!MID_Advection || !RT_Composite || !RT_Advection) return;
+
+	MID_Advection->SetTextureParameterValue(TEXT("Texture"), RT_Composite);
+	MID_Advection->SetScalarParameterValue(TEXT("DeltaTime"), DeltaTime);
+	MID_Advection->SetScalarParameterValue(TEXT("Dissipation"), Dissipation);
+
+	if (CollisionMask)
+		MID_Advection->SetTextureParameterValue(TEXT("CollisionMask"), CollisionMask);
+
+	UKismetRenderingLibrary::DrawMaterialToRenderTarget(this, RT_Advection, MID_Advection);
+}
+
+// --------------------------------------------------------------------------
+// Step 4: 散度 — 计算速度场的散度
+//   Divergence: RT_Advection → RT_PressureDivergence
+// --------------------------------------------------------------------------
+void UMyNinjaLiveComponent::StepDivergence()
+{
+	if (!MID_Divergence || !RT_Composite || !RT_PressureDivergence) return;
+
+	MID_Divergence->SetTextureParameterValue(TEXT("Texture"), RT_Composite);
+
+	UKismetRenderingLibrary::DrawMaterialToRenderTarget(this, RT_PressureDivergence, MID_Divergence);
+}
+
+// --------------------------------------------------------------------------
+// Step 5: 压力求解 — 解泊松方程 ∇²p = ∇·v
+//   Solver2 (默认, 1次迭代+kernel reduction):
+//     Clear → PressureSolverInit(divergence→pressure)
+//     → PressureSolverIter × PressureSolver2_MaxIterations
+//   Solver1 (可选, N次 Jacobi 迭代):
+//     Clear → PressureSolverInit → PressureSolverIter × N
+// --------------------------------------------------------------------------
+void UMyNinjaLiveComponent::StepPressureSolve()
+{
+	if (!MID_PressureSolverInit || !RT_PressureDivergence || !RT_PressureDivergenceTemp) return;
+
+	// 清空临时缓冲
+	UKismetRenderingLibrary::ClearRenderTarget2D(this, RT_PressureDivergenceTemp, FLinearColor::Black);
+
+	// Step1: 初始化解 (MI_Pressure_Solver2_Step1)
+	MID_PressureSolverInit->SetTextureParameterValue(TEXT("Divergence"), RT_PressureDivergence);
+	MID_PressureSolverInit->SetTextureParameterValue(TEXT("Texture"), RT_PressureDivergenceTemp);
+	UKismetRenderingLibrary::DrawMaterialToRenderTarget(this, RT_PressureDivergenceTemp, MID_PressureSolverInit);
+
+	// 迭代求解
+	int32 IterCount = bUsePressureSolver1
+		? PressureSolver1_MaxIterations
+		: PressureSolver2_MaxIterations;
+
+	for (int32 i = 0; i < IterCount; i++)
+	{
+		MID_PressureSolverIter->SetTextureParameterValue(TEXT("Texture"), RT_PressureDivergenceTemp);
+		UKismetRenderingLibrary::DrawMaterialToRenderTarget(this, RT_PressureDivergenceTemp, MID_PressureSolverIter);
+	}
+
+	// 复制结果到 RT_PressureDivergence (供 PressureCorrection 读取)
+	CopyRT(RT_PressureDivergenceTemp, RT_PressureDivergence);
+}
+
+// --------------------------------------------------------------------------
+// Step 6: 压力梯度修正 — v' = v - ∇p
+//   从速度场减去压力梯度，使速度场无散度
+//   PressureCorrection / CompositeGradient:
+//     RT_Advection(vel) + RT_PressureDivergence(pressure) → RT_WorkBuffer
+// --------------------------------------------------------------------------
+void UMyNinjaLiveComponent::StepPressureCorrection()
+{
+	if (!RT_Composite || !RT_PressureDivergence || !RT_WorkBuffer) return;
+
+	// 使用 PressureCorrectionMat 或 fallback 到 CompositeGradient
+	UMaterialInstanceDynamic* MID_Correction = MID_PressureCorrection ? MID_PressureCorrection : MID_CompositeGradient;
+	if (!MID_Correction) return;
+
+	// PressureCorrection 材质也使用 VeloInputTexture + VeloPainter 参数名
+	MID_Correction->SetTextureParameterValue(TEXT("VeloInputTexture"), RT_Composite);
+	MID_Correction->SetTextureParameterValue(TEXT("VeloPainter"), RT_PressureDivergence);
+	MID_Correction->SetScalarParameterValue(TEXT("DeltaTime"), 1.0f);
+
+	UKismetRenderingLibrary::DrawMaterialToRenderTarget(this, RT_WorkBuffer, MID_Correction);
+}
+
+// --------------------------------------------------------------------------
+// Step 7: 密度注入 (Canvas) — 在交互位置注入密度
+//   直接在 RT_Composite 上画白色方块作为密度源
+//   通道布局: R=VelX, G=VelY, B=Density(1.0), A=alpha
+// --------------------------------------------------------------------------
+void UMyNinjaLiveComponent::StepInjectDensityCanvas(const FVector2D& UV,
+	const FVector2D& VelocityEncoded, float DensityAmount)
+{
+	if (!RT_Composite) return;
+
+	UTexture2D* WhiteTex = LoadObject<UTexture2D>(nullptr,
+		TEXT("/Engine/EngineResources/WhiteSquareTexture.WhiteSquareTexture"));
+	UCanvas* Canvas = nullptr;
+	FVector2D CanvasSize = FVector2D((float)ResolutionX, (float)ResolutionY);
+	FDrawToRenderTargetContext Context;
+
+	UKismetRenderingLibrary::BeginDrawCanvasToRenderTarget(
+		this, RT_Composite, Canvas, CanvasSize, Context);
+
+	if (Canvas && WhiteTex)
+	{
+		const float BaseSize = CanvasSize.X * 0.08f * GlobalBrushScale * UserInputBrushScale;
+		// 多层绘制实现软边界
+		for (int32 r = 0; r < 6; r++)
+		{
+			float t = (float)r / 5.0f;
+			float alpha = (1.0f - t * t) * DensityAmount;
+			float size = BaseSize * (1.0f + t * 1.5f);
+			FVector2D Pos(UV.X * CanvasSize.X - size * 0.5f,
+						  UV.Y * CanvasSize.Y - size * 0.5f);
+			Canvas->K2_DrawTexture(WhiteTex, Pos, FVector2D(size, size),
+				FVector2D(0, 0), FVector2D(1, 1),
+				FLinearColor(VelocityEncoded.X, VelocityEncoded.Y, 1.0f, alpha),
+				BLEND_Additive);
+		}
+	}
+
+	UKismetRenderingLibrary::EndDrawCanvasToRenderTarget(this, Context);
+}
+
+// --------------------------------------------------------------------------
+// Step 8: 更新显示 — 将最终结果写入 RT_Output 并更新材质参数
+// --------------------------------------------------------------------------
+void UMyNinjaLiveComponent::StepUpdateDisplay()
+{
+	// 将最终结果复制到 RT_Output
+	if (MID_Display && RT_Composite && RT_Output)
+	{
+		MID_Display->SetTextureParameterValue(TEXT("VelocityDensityBuffer"), RT_Composite);
+		if (RT_Painter)
+			MID_Display->SetTextureParameterValue(TEXT("PaintBuffer"), RT_Painter);
+		if (RT_PressureDivergence)
+			MID_Display->SetTextureParameterValue(TEXT("PressureBuffer"), RT_PressureDivergence);
+
+		UKismetRenderingLibrary::DrawMaterialToRenderTarget(this, RT_Output, MID_Display);
+	}
+
+	// 更新 DisplayPlane 材质
+	if (MID_ActiveDisplay)
+	{
+		MID_ActiveDisplay->SetTextureParameterValue(TEXT("VelocityDensityBuffer"), RT_Output);
+		if (RT_Painter)
+			MID_ActiveDisplay->SetTextureParameterValue(TEXT("PaintBuffer"), RT_Painter);
+	}
+}
+
+// ============================================================================
+// RT 复制 (通过 Advection MID passthrough)
+// ============================================================================
+void UMyNinjaLiveComponent::CopyRT(UTextureRenderTarget2D* Src, UTextureRenderTarget2D* Dst)
+{
+	if (!Src || !Dst || !MID_Advection) return;
+
+	MID_Advection->SetTextureParameterValue(TEXT("Texture"), Src);
+	MID_Advection->SetScalarParameterValue(TEXT("DeltaTime"), 0.0f);
+	MID_Advection->SetScalarParameterValue(TEXT("Dissipation"), 1.0f);  // 无消散
+	UKismetRenderingLibrary::DrawMaterialToRenderTarget(this, Dst, MID_Advection);
+}
+
+// ============================================================================
+// 全仿真管线 — 正确流体模拟顺序
+// ============================================================================
+//
+//  0. ClearCollision (RT_Painter)
+//  1. CollisionPainter (LineTrace → RT_Painter)
+//  2. CompositeGradient: RT_Composite + RT_Painter → RT_WorkBuffer  (add forces)
+//     CopyRT: RT_WorkBuffer → RT_Composite (forces applied)
+//  3. Advection: RT_Composite → RT_Advection (advect along velocity)
+//     CopyRT: RT_Advection → RT_Composite (advected state)
+//  4. Divergence: RT_Composite → RT_PressureDivergence
+//  5. PressureSolve: iterate on RT_PressureDivergence + Temp
+//  6. PressureCorrection: RT_Composite - ∇p → RT_WorkBuffer  (project)
+//     CopyRT: RT_WorkBuffer → RT_Composite (corrected)
+//  7. DensityInjection: Canvas draw → RT_Composite
+//  8. Copy: RT_Composite → RT_Output & UpdateDisplay
+//
+// ============================================================================
+void UMyNinjaLiveComponent::RunSimulationPipeline(float DeltaTime)
+{
+	// ---- 种子帧: 初始密度 ----
+	if (TickFrameCount < 3)
+	{
+		if (TickFrameCount == 0)
+		{
+			StepInjectDensityCanvas(FVector2D(0.5f, 0.5f), FVector2D(0.5f, 0.5f), 0.5f);
+			StepInjectDensityCanvas(FVector2D(0.3f, 0.5f), FVector2D(0.52f, 0.5f), 0.3f);
+			StepInjectDensityCanvas(FVector2D(0.7f, 0.5f), FVector2D(0.48f, 0.5f), 0.3f);
+		}
+		StepAdvection(DeltaTime);
+		CopyRT(RT_Advection, RT_Composite);
+		StepUpdateDisplay();
+		return;
+	}
+
+	// ===================================================================
+	// 主循环
+	// ===================================================================
+
+	// ---- Step 0: 清除碰撞 RT ----
+	StepCollisionClear();
+
+	// ---- Step 1: 碰撞绘制 (LineTrace → RT_Painter) ----
+	if (bCameraTraceHit)
+	{
+		FVector2D VelEnc = EncodeVelocity(CameraTraceHitVelocity);
+		StepCollisionPainter(CameraTraceHitUV, VelEnc, DeltaTime);
+	}
+
+	// ---- Step 2: 外力合成 (forces into velocity field) ----
+	// RT_Composite(current) + RT_Painter(collision) → RT_WorkBuffer
+	if (MID_CompositeGradient)
+	{
+		StepCompositeGradient(DeltaTime);
+		CopyRT(RT_WorkBuffer, RT_Composite);  // forces applied → current state
+	}
+
+	// ---- Step 3: 平流 (advect density+velocity) ----
+	StepAdvection(DeltaTime);
+	CopyRT(RT_Advection, RT_Composite);      // advected → current state
+
+	// ---- Step 4: 散度 ----
+	StepDivergence();
+
+	// ---- Step 5: 压力求解 ----
+	StepPressureSolve();
+
+	// ---- Step 6: 压力梯度修正 (v -= ∇p) ----
+	StepPressureCorrection();
+	CopyRT(RT_WorkBuffer, RT_Composite);      // corrected → current state
+
+	// ---- Step 7: 密度注入 ----
+	if (bCameraTraceHit)
+	{
+		FVector2D VelEnc = EncodeVelocity(CameraTraceHitVelocity);
+		StepInjectDensityCanvas(CameraTraceHitUV, VelEnc);
+	}
+
+	// ---- Step 8: 更新显示 ----
+	StepUpdateDisplay();
+}
+
+// ============================================================================
+// 玩家脚步交互
+// ============================================================================
+void UMyNinjaLiveComponent::PlayerStepInteraction(float DeltaTime)
+{
+	APawn* PlayerPawn = UGameplayStatics::GetPlayerPawn(this, 0);
+	if (!PlayerPawn) return;
+
+	FVector PlayerVelocity = PlayerPawn->GetVelocity();
+	float Speed = PlayerVelocity.Size();
+
+	if (Speed < DampenBrushBelowThisVelocity) return;
+
+	FVector2D SimUV = WorldToSimUV(PlayerPawn->GetActorLocation());
+	SimUV.X = FMath::Clamp(SimUV.X, 0.0f, 1.0f);
+	SimUV.Y = FMath::Clamp(SimUV.Y, 0.0f, 1.0f);
+
+	FVector2D VelEnc = EncodeVelocity(PlayerVelocity);
+	StepInjectDensityCanvas(SimUV, VelEnc);
+}
+
+// ============================================================================
+// 相机 LineTrace 交互
+// ============================================================================
+void UMyNinjaLiveComponent::HandleCameraLineTrace(float DeltaTime)
+{
+	if (UseCustomTraceSource) return;
+
+	FVector TraceStart, TraceEnd;
+	GetTraceSource(TraceStart, TraceEnd);
+
+	if (TraceStart.IsZero() && TraceEnd.IsZero())
+	{
+		bCameraTraceHit = false;
+		return;
+	}
+
+	FHitResult Hit = PerformLineTrace(TraceStart, TraceEnd);
+	bCameraTraceHit = Hit.bBlockingHit;
+
+	if (bCameraTraceHit)
+	{
+		CameraTraceHitUV = WorldToSimUV(Hit.Location);
+		CameraTraceHitVelocity = FVector::ZeroVector;
+
+		if (AActor* HitActor = Hit.GetActor())
+			CameraTraceHitVelocity = HitActor->GetVelocity();
+
+		// 从 UV 运动计算速度（相机扫过平面时的视差速度）
+		if (CameraTraceLastUV.X >= 0.0f && DeltaTime > 0.0f)
+		{
+			FVector2D UVDelta = (CameraTraceHitUV - CameraTraceLastUV) / DeltaTime;
+			UVDelta.X = FMath::Clamp(UVDelta.X, -2.0f, 2.0f);
+			UVDelta.Y = FMath::Clamp(UVDelta.Y, -2.0f, 2.0f);
+
+			FVector CombinedVelocity = CameraTraceHitVelocity +
+				FVector(UVDelta.X * MaxVelocity, UVDelta.Y * MaxVelocity, 0.0f);
+			FVector2D VelEnc = EncodeVelocity(CombinedVelocity);
+			StepCollisionPainter(CameraTraceHitUV, VelEnc, DeltaTime);
+			AddInteractionPoint(CameraTraceHitUV, CombinedVelocity);
+		}
+		CameraTraceLastUV = CameraTraceHitUV;
+	}
+	else
+	{
+		CameraTraceLastUV = FVector2D(-1.0f, -1.0f);
+	}
+}
+
 // ============================================================================
 // 激活检测
 // ============================================================================
 bool UMyNinjaLiveComponent::ShouldSimulationRun() const
 {
-	if (!bInitialized || bDisableComponent)
-		return false;
-	if (!bActivatedByPawnProximity)
-		return true;
-	if (ActiveActivationTargets.Num() > 0)
-		return true;
+	if (!bInitDone || bDisableComponent) return false;
+	if (!bComponentActivatedByPawnProximity) return true;
+	if (ActiveActivationTargets.Num() > 0) return true;
 	return bPawnInsideBounds;
 }
+
 // ============================================================================
-// 重叠交互 — 对齐原版 OverlapFilter 逻辑
+// 重叠交互
 // ============================================================================
 void UMyNinjaLiveComponent::AddInteractionPoint(const FVector2D& UV, const FVector& WorldVelocity)
 {
-	if (!bInitialized || bDisableComponent) return;
-	// 对齐原版: 低速阻尼过滤
+	if (!bInitDone || bDisableComponent) return;
+
 	float Speed = WorldVelocity.Size();
 	if (Speed < DampenBrushBelowThisVelocity) return;
-	// 对齐原版: GlobalBrushScale + UserInputBrushScale → 实际画笔尺寸
-	float EffectiveBrushSize = GlobalBrushScale * 0.01f * UserInputBrushScale;
+
 	FVector2D VelEnc = EncodeVelocity(WorldVelocity);
-	// ---- 密度注入 (对齐原版 Painter → Density inject) ----
-	if (MID_DensityInject && RT_VelocityA)
+
+	// 密度注入
+	if (RT_Composite)
+		StepInjectDensityCanvas(UV, VelEnc);
+
+	// 碰撞绘制
+	if (MID_CollisionPainterDot && RT_Painter)
 	{
-		MID_DensityInject->SetVectorParameterValue(TEXT("Position"), FLinearColor(UV.X, UV.Y, 0, 1));
-		MID_DensityInject->SetVectorParameterValue(TEXT("Velocity"), FLinearColor(VelEnc.X, VelEnc.Y, 0, 1));
-		MID_DensityInject->SetScalarParameterValue(TEXT("BrushSize"), EffectiveBrushSize);
-		MID_DensityInject->SetScalarParameterValue(TEXT("BrushStrength"), 1.0f);
-		MID_DensityInject->SetScalarParameterValue(TEXT("BrushHardness"), 0.5f);
-		MID_DensityInject->SetScalarParameterValue(TEXT("DeltaTime"), 0.016f);
-		UKismetRenderingLibrary::DrawMaterialToRenderTarget(this, RT_VelocityA, MID_DensityInject);
-	}
-	// ---- 碰撞绘制 (供 CompositeGradient 读取) ----
-	if (MID_CollisionPainterDot && RT_Collision)
-	{
+		const float EffectiveBrushSize = BrushSize * GlobalBrushScale * UserInputBrushScale;
 		MID_CollisionPainterDot->SetVectorParameterValue(TEXT("Position"), FLinearColor(UV.X, UV.Y, 0, 1));
 		MID_CollisionPainterDot->SetVectorParameterValue(TEXT("Velocity"), FLinearColor(VelEnc.X, VelEnc.Y, 0, 1));
 		MID_CollisionPainterDot->SetScalarParameterValue(TEXT("BrushSize"), EffectiveBrushSize);
-		MID_CollisionPainterDot->SetScalarParameterValue(TEXT("BrushStrength"), 1.0f);
-		MID_CollisionPainterDot->SetScalarParameterValue(TEXT("BrushHardness"), 0.5f);
+		MID_CollisionPainterDot->SetScalarParameterValue(TEXT("BrushStrength"), BrushStrength);
+		MID_CollisionPainterDot->SetScalarParameterValue(TEXT("BrushHardness"), BrushHardness);
 		MID_CollisionPainterDot->SetScalarParameterValue(TEXT("DeltaTime"), 0.016f);
-		UKismetRenderingLibrary::DrawMaterialToRenderTarget(this, RT_Collision, MID_CollisionPainterDot);
+		UKismetRenderingLibrary::DrawMaterialToRenderTarget(this, RT_Painter, MID_CollisionPainterDot);
 	}
 }
+
 void UMyNinjaLiveComponent::AddInteractionTarget(AActor* Target)
 {
-	if (Target)
-	{
-		ActiveInteractionTargets.AddUnique(Target);
-	}
+	if (Target) ActiveInteractionTargets.AddUnique(Target);
 }
+
 void UMyNinjaLiveComponent::RemoveInteractionTarget(AActor* Target)
 {
 	ActiveInteractionTargets.Remove(Target);
 }
+
 void UMyNinjaLiveComponent::AddActiveTarget(AActor* Target)
 {
 	ActiveActivationTargets.AddUnique(Target);
 	bPawnInsideBounds = true;
 }
+
 void UMyNinjaLiveComponent::RemoveActiveTarget(AActor* Target)
 {
 	ActiveActivationTargets.Remove(Target);

@@ -1,7 +1,10 @@
 // SimpleFluidActor.h — 全量复刻 /Game/FluidNinjaLive/NinjaLive.NinjaLive
 //
 // 组件结构对齐原版：
-//   Root → DisplayPlane(TraceMesh) + ActivationVolume + InteractionVolume + NinjaLiveComponent
+//   Root → TraceMesh(DisplayPlane) + EditorIcon
+//        + ActivationVolume + InteractionVolume + NinjaLiveComponent
+//
+// 使用方式：在关卡中放置 BP_SimpleFluidActor 或 C++ ASimpleFluidActor
 
 #pragma once
 
@@ -14,13 +17,12 @@ class UStaticMeshComponent;
 class UBoxComponent;
 class UMaterialBillboardComponent;
 
-/** TraceMesh 非激活行为 (对齐原版) */
 UENUM(BlueprintType)
 enum class ETraceMeshInactiveBehaviour : uint8
 {
-	KeepVisible		UMETA(DisplayName = "Keep Visible"),
-	Hide			UMETA(DisplayName = "Hide"),
-	CollisionOnly	UMETA(DisplayName = "Collision Only")
+	KeepVisible      UMETA(DisplayName = "Keep Visible"),
+	Hide             UMETA(DisplayName = "Hide"),
+	CollisionOnly    UMETA(DisplayName = "Collision Only")
 };
 
 UCLASS(Blueprintable)
@@ -41,6 +43,7 @@ public:
 	UPROPERTY(VisibleAnywhere, Category = "Components")
 	TObjectPtr<USceneComponent> Root;
 
+	/** 对齐 BP TraceMesh */
 	UPROPERTY(VisibleAnywhere, Category = "Components")
 	TObjectPtr<UStaticMeshComponent> DisplayPlane;
 
@@ -60,131 +63,91 @@ public:
 	// Actor 属性 (对齐 NinjaLive BP 的 Actor 级配置)
 	// =============================================================
 
-	UPROPERTY(EditAnywhere, Category = "NinjaLive|Actor")
-	bool ShowTraceMeshInEditor = false;  // BP CDO (Pool_0: false)
+	UPROPERTY(EditAnywhere, Category = "NinjaLive|Interaction")
+	bool ShowTraceMeshInEditor = true;  // BP CDO: true
 
-	UPROPERTY(EditAnywhere, Category = "NinjaLive|Actor")
+	UPROPERTY(EditAnywhere, Category = "NinjaLive|Activation")
 	ETraceMeshInactiveBehaviour TraceMeshInactiveBehaviour = ETraceMeshInactiveBehaviour::KeepVisible;
 
-	UPROPERTY(EditAnywhere, Category = "NinjaLive|Actor")
-	FVector TraceMeshSize = FVector(20.5f, 20.5f, 1.0f);  // BP CDO (Pool_0: 20.5,20.5,1.0)
+	/** BP TraceMeshSize = (1,1,1) — DisplayPlane scale */
+	UPROPERTY(EditAnywhere, Category = "NinjaLive|Interaction")
+	FVector TraceMeshSize = FVector(1.0f, 1.0f, 1.0f);
 
-	UPROPERTY(EditAnywhere, Category = "NinjaLive|Actor")
-	bool SimActivatedByPawnProximity = true;  // BP CDO (Pool_0: true)
+	/** BP SimActivatedByPawnProximity = false */
+	UPROPERTY(EditAnywhere, Category = "NinjaLive|Activation")
+	bool SimActivatedByPawnProximity = false;
 
-	UPROPERTY(EditAnywhere, Category = "NinjaLive|Actor")
-	FVector ActivationVolumeSize = FVector(80.0f, 80.0f, 50.0f);  // BP CDO (Pool_0: 80,80,50)
+	/** BP ActivationVolumeSize = (50,50,50) */
+	UPROPERTY(EditAnywhere, Category = "NinjaLive|Activation")
+	FVector ActivationVolumeSize = FVector(50.0f, 50.0f, 50.0f);
 
-	UPROPERTY(EditAnywhere, Category = "NinjaLive|Actor")
-	FVector InteractionVolumeSize = FVector(20.5f, 20.5f, 0.1f);  // BP CDO (Pool_0: 20.5,20.5,0.1)
+	/** BP InteractionVolumeSize = (1,1,1) */
+	UPROPERTY(EditAnywhere, Category = "NinjaLive|Interaction")
+	FVector InteractionVolumeSize = FVector(1.0f, 1.0f, 1.0f);
 
-	UPROPERTY(EditAnywhere, Category = "NinjaLive|Actor")
+	UPROPERTY(EditAnywhere, Category = "NinjaLive|Interaction")
 	FName InteractionVolumeTemplate = "InteractionVolume";
 
-	UPROPERTY(EditAnywhere, Category = "NinjaLive|Actor")
+	/** BP OverlapFilterInclusiveObjType = all */
+	UPROPERTY(EditAnywhere, Category = "NinjaLive|Interaction")
 	TArray<TEnumAsByte<EObjectTypeQuery>> OverlapFilterInclusiveObjType;
 
-	UPROPERTY(EditAnywhere, Category = "NinjaLive|Actor")
+	/** BP OverlapFilterInclusiveBoneNameExact = empty (no bone filter) */
+	UPROPERTY(EditAnywhere, Category = "NinjaLive|Interaction")
 	TArray<FName> OverlapFilterInclusiveBoneNameExact;
 
-	// =============================================================
-	// 组件转发属性 (直接在细节面板配置)
-	// =============================================================
+	/** BP 不活跃时灰化材质 */
+	UPROPERTY(EditAnywhere, Category = "NinjaLive|Activation")
+	TObjectPtr<class UMaterialInstance> InactiveGrayMaterial;
 
-	UPROPERTY(EditAnywhere, Category = "NinjaLive|Simulation",
-		meta=(ClampMin=64, ClampMax=4096))
-	int32 ResolutionX = 1600;  // BP CDO (Pool_0: 1600)
+	// ---- 组件覆盖属性 (传递到 NinjaLiveComponent) ----
+	UPROPERTY(EditAnywhere, Category = "NinjaLive|Component Overrides",
+		meta=(InlineEditConditionToggle))
+	bool OverrideComponentVariables = false;
 
-	UPROPERTY(EditAnywhere, Category = "NinjaLive|Simulation",
-		meta=(ClampMin=64, ClampMax=4096))
-	int32 ResolutionY = 1600;  // BP CDO (Pool_0: 1600)
+	UPROPERTY(EditAnywhere, Category = "NinjaLive|Component Overrides",
+		meta=(EditCondition="OverrideComponentVariables"))
+	int32 Override_ResolutionX = 256;
 
-	UPROPERTY(EditAnywhere, Category = "NinjaLive|Brush")
-	float GlobalBrushScale = 4.0f;  // BP CDO (Pool_0: 4.0)
+	UPROPERTY(EditAnywhere, Category = "NinjaLive|Component Overrides",
+		meta=(EditCondition="OverrideComponentVariables"))
+	int32 Override_ResolutionY = 256;
 
-	UPROPERTY(EditAnywhere, Category = "NinjaLive|Brush")
-	float UserInputBrushScale = 1.2f;  // BP CDO (Pool_0: 1.2)
+	UPROPERTY(EditAnywhere, Category = "NinjaLive|Component Overrides",
+		meta=(EditCondition="OverrideComponentVariables"))
+	float Override_GlobalBrushScale = 1.0f;
 
-	UPROPERTY(EditAnywhere, Category = "NinjaLive|Brush")
-	bool BrushScaledByInteractingObjSize = true;  // BP CDO (Pool_0: true)
+	UPROPERTY(EditAnywhere, Category = "NinjaLive|Component Overrides",
+		meta=(EditCondition="OverrideComponentVariables"))
+	int32 Override_OutputMaterialSelected = 1;
 
-	UPROPERTY(EditAnywhere, Category = "NinjaLive|Brush")
-	float BrushVelocityNoiseFreq = 0.1f;
+	UPROPERTY(EditAnywhere, Category = "NinjaLive|Component Overrides",
+		meta=(EditCondition="OverrideComponentVariables"))
+	bool Override_bLOD1_ReduceSimQuality = false;
 
-	UPROPERTY(EditAnywhere, Category = "NinjaLive|Brush")
-	float DampenBrushBelowThisVelocity = 0.01f;  // BP CDO (Pool_0: 0.01)
+	UPROPERTY(EditAnywhere, Category = "NinjaLive|Component Overrides",
+		meta=(EditCondition="OverrideComponentVariables"))
+	bool Override_bLOD2_ReduceSamplingFPS = false;
 
-	UPROPERTY(EditAnywhere, Category = "NinjaLive|Trace")
-	bool UseCustomTraceSource = true;  // BP CDO (Pool_0: true)
+	UPROPERTY(EditAnywhere, Category = "NinjaLive|Component Overrides",
+		meta=(EditCondition="OverrideComponentVariables"))
+	float Override_LOD_NearBound = 2000.0f;
 
-	UPROPERTY(EditAnywhere, Category = "NinjaLive|Trace")
-	FVector CustomTraceSourcePosition = FVector(200.0f, 200.0f, 5000.0f);  // BP CDO (Pool_0: 200,200,5000)
+	UPROPERTY(EditAnywhere, Category = "NinjaLive|Component Overrides",
+		meta=(EditCondition="OverrideComponentVariables"))
+	float Override_LOD_FarBound = 5000.0f;
 
-	UPROPERTY(EditAnywhere, Category = "NinjaLive|Trace")
-	float TraceDistance = 5000.0f;
+	/** BP DownscaleCollisionPainterResolution = 1 */
+	UPROPERTY(EditAnywhere, Category = "NinjaLive|Component Overrides",
+		meta=(EditCondition="OverrideComponentVariables"))
+	int32 Override_DownscaleCollisionPainterResolution = 1;
 
-	UPROPERTY(EditAnywhere, Category = "NinjaLive|Trace")
-	TArray<TEnumAsByte<EObjectTypeQuery>> ObjectTypes;
-
-	UPROPERTY(EditAnywhere, Category = "NinjaLive|Simulation",
-		meta=(ClampMin=1, ClampMax=32))
-	int32 PressureIterations = 8;
-
-	UPROPERTY(EditAnywhere, Category = "NinjaLive|Simulation",
-		meta=(ClampMin=0.0f, ClampMax=1.0f))
-	float Dissipation = 0.99f;
-
-	UPROPERTY(EditAnywhere, Category = "NinjaLive|Simulation")
-	float PlaneWorldSize = 8200.0f;  // SM_plane_400x400 * scale 20.5
-
-	UPROPERTY(EditAnywhere, Category = "NinjaLive|Simulation")
-	float MaxVelocity = 500.0f;
-
-	UPROPERTY(EditAnywhere, Category = "NinjaLive|Preset")
-	TObjectPtr<class UDataTable> DefaultPreset;
-
-	UPROPERTY(EditAnywhere, Category = "NinjaLive|Preset")
-	FString PresetNameFilterCriteria = TEXT("Usecase");
-
-	UPROPERTY(EditAnywhere, Category = "NinjaLive|Materials")
-	TArray<TObjectPtr<class UMaterialInstance>> OutputMaterials;
-
-	UPROPERTY(EditAnywhere, Category = "NinjaLive|Materials")
-	int32 OutputMaterialSelected = 0;  // BP CDO (Pool_0: 0)
-
-	// ---- 材质 ----
-	UPROPERTY(EditAnywhere, Category = "NinjaLive|Materials")
-	TObjectPtr<class UMaterialInstance> CollisionPainterDotMat;
-
-	UPROPERTY(EditAnywhere, Category = "NinjaLive|Materials")
-	TObjectPtr<class UMaterialInstance> CollisionPainterLineMat;
-
-	UPROPERTY(EditAnywhere, Category = "NinjaLive|Materials")
-	TObjectPtr<class UMaterialInstance> AdvectionMat;
-
-	UPROPERTY(EditAnywhere, Category = "NinjaLive|Materials")
-	TObjectPtr<class UMaterialInstance> CompositeGradientMat;
-
-	UPROPERTY(EditAnywhere, Category = "NinjaLive|Materials")
-	TObjectPtr<class UMaterialInstance> DivergenceMat;
-
-	UPROPERTY(EditAnywhere, Category = "NinjaLive|Materials")
-	TObjectPtr<class UMaterialInstance> PressureSolverMat;
-
-	UPROPERTY(EditAnywhere, Category = "NinjaLive|Materials")
-	TObjectPtr<class UMaterialInstance> PressureSolverIterMat;
-
-	UPROPERTY(EditAnywhere, Category = "NinjaLive|Materials")
-	TObjectPtr<class UMaterialInstance> DisplayMat;
-
-	UPROPERTY(EditAnywhere, Category = "NinjaLive|Materials")
-	TObjectPtr<class UMaterialInstance> PressureCorrectionMat;
-
-	UPROPERTY(EditAnywhere, Category = "NinjaLive|Debug")
-	bool bShowDebugMessages = false;
+	/** BP DownscalePressureResolution = 1 */
+	UPROPERTY(EditAnywhere, Category = "NinjaLive|Component Overrides",
+		meta=(EditCondition="OverrideComponentVariables"))
+	int32 Override_DownscalePressureResolution = 1;
 
 protected:
-	/** Overlap handlers — 对齐原版 OverlapFilter 逻辑 */
 	UFUNCTION()
 	void OnInteractionVolumeBeginOverlap(UPrimitiveComponent* OverlappedComp, AActor* Other,
 		UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult);
@@ -201,12 +164,7 @@ protected:
 	void OnActivationVolumeEndOverlap(UPrimitiveComponent* OverlappedComp, AActor* Other,
 		UPrimitiveComponent* OtherComp, int32 OtherBodyIndex);
 
-	/** 判断重叠对象是否符合过滤条件 */
 	bool DoesOverlapPassFilter(AActor* Other, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex = INDEX_NONE) const;
-
-	/** 从重叠位置计算仿真 UV */
 	FVector2D OverlapToSimUV(const FVector& WorldPos) const;
-
-	/** 同步所有属性到组件 */
 	void SyncPropertiesToComponent();
 };

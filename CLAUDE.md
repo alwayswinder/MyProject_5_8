@@ -93,6 +93,18 @@ Generate Visual Studio project files: right-click `.uproject` > "Generate Visual
 | `Content/Python` | Python editor scripts |
 | `Content/Localization` | Game localization data |
 
+## MCP Automation Bridge Plugin
+
+Additional MCP server plugin (`McpAutomationBridge`) providing extended editor automation tools beyond the built-in MCP:
+
+- **Transport**: Native MCP Streamable HTTP (no Node.js needed)
+- **URL**: `http://localhost:3000/mcp`
+- **Config**: Edit → Project Settings → Plugins → MCP Automation Bridge
+- **Security**: Loopback-only by default (127.0.0.1); enable LAN access via `bAllowNonLoopback`
+- **Tools**: Asset management, actor control, level management, animation, Niagara, sequencer, Blueprint graphs, materials, AI, audio, and more
+
+Registered in Claude Code as transport `http` at `http://localhost:3000/mcp`.
+
 ## Key Config
 
 - **DefaultGameMode**: `/Game/FirstPerson/Blueprints/BP_FirstPersonGameMode.BP_FirstPersonGameMode_C`
