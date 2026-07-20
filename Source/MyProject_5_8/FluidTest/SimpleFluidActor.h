@@ -1,14 +1,11 @@
 // SimpleFluidActor.h
-// 使用 FluidNinjaLive GPU 计算材质的最小流体模拟 Actor
+// FluidNinjaLive Actor — 包装 UMyNinjaLiveComponent，提供场景中的放置点
 //
-// 每帧仿真管线：
-//   1. CollisionPainter  -- 将玩家位置绘制到碰撞 RT
-//   2. 密度注入           -- 将碰撞密度写入密度场
-//   3. Advection         -- 平流密度场和速度场
-//   4. CompositeGradient -- 将碰撞力注入速度场
-//   5. Divergence        -- 计算散度
-//   6. PressureSolver    -- 迭代求解压力泊松方程
-//   7. Display           -- 在平面上显示密度 RT
+// 参考蓝图 /Game/FluidNinjaLive/NinjaLive.NinjaLive 结构：
+//   - Root (SceneComponent)
+//   - DisplayPlane / TraceMesh (StaticMeshComponent)
+//   - MyNinjaLiveComponent
+//   - 激活/交互体积 (BoxComponent)
 
 #pragma once
 
@@ -16,161 +13,163 @@
 #include "GameFramework/Actor.h"
 #include "SimpleFluidActor.generated.h"
 
+class UMyNinjaLiveComponent;
 class UStaticMeshComponent;
-class UTextureRenderTarget2D;
-class UMaterialInstance;
-class UMaterialInstanceDynamic;
+class UBoxComponent;
 
 UCLASS(Blueprintable)
-class ASimpleFluidActor : public AActor
+class MYPROJECT_5_8_API ASimpleFluidActor : public AActor
 {
 	GENERATED_BODY()
 
 public:
 	ASimpleFluidActor();
 
+	virtual void OnConstruction(const FTransform& Transform) override;
 	virtual void BeginPlay() override;
 	virtual void Tick(float DeltaTime) override;
 
-protected:
-	// ---------------------------------------------------------
+	// =============================================================
 	// 组件
-	// ---------------------------------------------------------
+	// =============================================================
+
+	/** 根 SceneComponent */
+	UPROPERTY(VisibleAnywhere, Category = "Components")
+	USceneComponent* Root;
+
+	/** 显示平面 / TraceMesh — 流体模拟输出在这个平面上 */
 	UPROPERTY(VisibleAnywhere, Category = "Components")
 	UStaticMeshComponent* DisplayPlane;
 
-	// ---------------------------------------------------------
-	// FluidNinjaLive 材质引用（在细节面板中指定）
-	// ---------------------------------------------------------
-	/** 碰撞画笔（点模式）- 将碰撞位置绘制到 RT */
-	UPROPERTY(EditAnywhere, Category = "FluidSim|Materials")
-	UMaterialInstance* CollisionPainterDotMat;
+	/** C++ 版 NinjaLiveComponent */
+	UPROPERTY(VisibleAnywhere, Category = "Components")
+	UMyNinjaLiveComponent* NinjaLiveComponent;
 
-	/** 碰撞偏移 - 将碰撞速度注入速度场 */
-	UPROPERTY(EditAnywhere, Category = "FluidSim|Materials")
-	UMaterialInstance* CollisionPainterOffsetMat;
+	/** 激活体积（可选）— 用于玩家距离激活检测 */
+	UPROPERTY(VisibleAnywhere, Category = "Components")
+	UBoxComponent* ActivationVolume;
 
-	/** 平流材质 - 半拉格朗日平流，移动密度/速度场 */
-	UPROPERTY(EditAnywhere, Category = "FluidSim|Materials")
-	UMaterialInstance* AdvectionMat;
+	/** 交互体积（可选）— 用于重叠检测 */
+	UPROPERTY(VisibleAnywhere, Category = "Components")
+	UBoxComponent* InteractionVolume;
 
-	/** 外力合成 - 将碰撞力叠加到速度场 */
-	UPROPERTY(EditAnywhere, Category = "FluidSim|Materials")
-	UMaterialInstance* CompositeAndGradientMat;
+	// ---- 体积尺寸 ----
 
-	/** 散度计算材质 */
-	UPROPERTY(EditAnywhere, Category = "FluidSim|Materials")
-	UMaterialInstance* DivergenceMat;
+	/** 激活体积半尺寸（XY 应与 DisplayPlane 覆盖范围匹配） */
+	UPROPERTY(EditAnywhere, Category = "Components|Volumes")
+	FVector ActivationVolumeExtent = FVector(1000.0f, 1000.0f, 500.0f);
 
-	/** 压力求解材质 - 迭代求解泊松方程 */
-	UPROPERTY(EditAnywhere, Category = "FluidSim|Materials")
-	UMaterialInstance* PressureSolverMat;
+	/** 交互体积半尺寸（XY 应与 DisplayPlane 范围匹配，Z 为表面交互厚度） */
+	UPROPERTY(EditAnywhere, Category = "Components|Volumes")
+	FVector InteractionVolumeExtent = FVector(1000.0f, 1000.0f, 5.0f);
 
-	/** 显示材质 - 应用到 DisplayPlane 上，黑白显示密度缓冲区 */
-	UPROPERTY(EditAnywhere, Category = "FluidSim|Materials")
-	UMaterialInstance* DensityDisplayMat;
+	// =============================================================
+	// 转发属性 — 映射到 UMyNinjaLiveComponent 的对应属性
+	// =============================================================
 
-	// ---------------------------------------------------------
-	// 仿真参数
-	// ---------------------------------------------------------
-	/** 仿真分辨率（建议 64~1024） */
-	UPROPERTY(EditAnywhere, Category = "FluidSim|Settings", meta = (ClampMin = 64, ClampMax = 1024))
-	int32 SimResolution = 256;
+	// ---- 激活 ----
+	UPROPERTY(EditAnywhere, Category = "Activation",
+		meta=(InlineEditConditionToggle))
+	bool bOverride_Activation = false;
 
-	/** 压力求解器迭代次数（越多越不可压缩，但越耗 GPU） */
-	UPROPERTY(EditAnywhere, Category = "FluidSim|Settings", meta = (ClampMin = 1, ClampMax = 16))
-	int32 PressureIterations = 4;
+	UPROPERTY(EditAnywhere, Category = "Activation",
+		meta=(EditCondition="bOverride_Activation"))
+	bool bDisableComponent = false;
 
-	/** 碰撞画笔大小（UV 空间 0~1） */
-	UPROPERTY(EditAnywhere, Category = "FluidSim|Settings", meta = (ClampMin = 0.0f))
-	float BrushSize = 0.05f;
+	UPROPERTY(EditAnywhere, Category = "Activation",
+		meta=(EditCondition="bOverride_Activation"))
+	bool bActivatedByPawnProximity = false;
 
-	/** 碰撞画笔强度 */
-	UPROPERTY(EditAnywhere, Category = "FluidSim|Settings", meta = (ClampMin = 0.0f))
-	float BrushStrength = 1.0f;
+	UPROPERTY(EditAnywhere, Category = "Activation",
+		meta=(EditCondition="bOverride_Activation", ClampMin=100.0f))
+	float ActivationDistance = 2000.0f;
 
-	/** 仿真平面的世界空间尺寸（用于 UV 映射） */
-	UPROPERTY(EditAnywhere, Category = "FluidSim|Settings")
-	float PlaneWorldSize = 2000.0f;
+	// ---- 仿真 ----
+	UPROPERTY(EditAnywhere, Category = "Simulation",
+		meta=(InlineEditConditionToggle))
+	bool bOverride_Simulation = false;
 
-	/** 最大速度（用于速度编码，值越大玩家移动产生的影响越小） */
-	UPROPERTY(EditAnywhere, Category = "FluidSim|Settings")
-	float MaxVelocity = 500.0f;
+	UPROPERTY(EditAnywhere, Category = "Simulation",
+		meta=(EditCondition="bOverride_Simulation", ClampMin=64, ClampMax=2048))
+	int32 ResolutionX = 512;
 
-	/** 密度消散率（每帧衰减，0.99 = 缓慢消散） */
-	UPROPERTY(EditAnywhere, Category = "FluidSim|Settings")
+	UPROPERTY(EditAnywhere, Category = "Simulation",
+		meta=(EditCondition="bOverride_Simulation", ClampMin=64, ClampMax=2048))
+	int32 ResolutionY = 512;
+
+	UPROPERTY(EditAnywhere, Category = "Simulation",
+		meta=(EditCondition="bOverride_Simulation", ClampMin=0, ClampMax=120))
+	int32 SimFPS = 0;
+
+	UPROPERTY(EditAnywhere, Category = "Simulation",
+		meta=(EditCondition="bOverride_Simulation", ClampMin=1, ClampMax=32))
+	int32 PressureIterations = 8;
+
+	UPROPERTY(EditAnywhere, Category = "Simulation",
+		meta=(EditCondition="bOverride_Simulation", ClampMin=0.0f, ClampMax=1.0f))
 	float Dissipation = 0.99f;
 
-	/** 自定义交互 Actor；为空时自动使用 GetPlayerPawn(0) */
-	UPROPERTY(EditAnywhere, Category = "FluidSim|Settings")
-	AActor* CustomInteractionActor = nullptr;
+	// ---- 画笔 ----
+	UPROPERTY(EditAnywhere, Category = "Brush",
+		meta=(InlineEditConditionToggle))
+	bool bOverride_Brush = false;
 
-private:
-	// ---------------------------------------------------------
-	// 运行时 RenderTargets
-	// ---------------------------------------------------------
-	UPROPERTY()
-	UTextureRenderTarget2D* RT_DensityA;      // 密度缓冲区 A
-	UPROPERTY()
-	UTextureRenderTarget2D* RT_DensityB;      // 密度缓冲区 B（双缓冲）
-	UPROPERTY()
-	UTextureRenderTarget2D* RT_VelocityA;     // 速度缓冲区 A
-	UPROPERTY()
-	UTextureRenderTarget2D* RT_VelocityB;     // 速度缓冲区 B（双缓冲）
-	UPROPERTY()
-	UTextureRenderTarget2D* RT_Pressure;      // 压力缓冲区
-	UPROPERTY()
-	UTextureRenderTarget2D* RT_Divergence;    // 散度缓冲区
-	UPROPERTY()
-	UTextureRenderTarget2D* RT_Collision;     // 碰撞输入缓冲区
+	UPROPERTY(EditAnywhere, Category = "Brush",
+		meta=(EditCondition="bOverride_Brush", ClampMin=0.0f))
+	float BrushSize = 0.05f;
 
-	// ---------------------------------------------------------
-	// 动态材质实例（可写的副本）
-	// ---------------------------------------------------------
-	UPROPERTY()
-	UMaterialInstanceDynamic* MID_CollisionPainterDot;
-	UPROPERTY()
-	UMaterialInstanceDynamic* MID_CollisionPainterOffset;
-	UPROPERTY()
-	UMaterialInstanceDynamic* MID_Advection;
-	UPROPERTY()
-	UMaterialInstanceDynamic* MID_CompositeAndGradient;
-	UPROPERTY()
-	UMaterialInstanceDynamic* MID_Divergence;
-	UPROPERTY()
-	UMaterialInstanceDynamic* MID_PressureSolver;
-	UPROPERTY()
-	UMaterialInstanceDynamic* MID_Display;
+	UPROPERTY(EditAnywhere, Category = "Brush",
+		meta=(EditCondition="bOverride_Brush", ClampMin=0.0f))
+	float BrushStrength = 1.0f;
 
-	// ---------------------------------------------------------
-	// 内部辅助函数
-	// ---------------------------------------------------------
-	/** 创建指定大小的 RenderTarget */
-	UTextureRenderTarget2D* CreateRT(FName Name, int32 Size);
-	/** 交换两个 RT 指针（双缓冲） */
-	void SwapRT(UTextureRenderTarget2D*& A, UTextureRenderTarget2D*& B);
-	/** 将世界坐标映射到仿真 UV 空间 (0~1) */
-	FVector2D WorldToSimUV(FVector WorldPos) const;
-	/** 将世界速度编码到纹理友好的 0~1 范围（0.5 = 零速度） */
-	FVector2D EncodeVelocity(FVector WorldVelocity) const;
-	/** 清空所有 RT */
-	void ClearAllRTs();
+	UPROPERTY(EditAnywhere, Category = "Brush",
+		meta=(EditCondition="bOverride_Brush", ClampMin=0.0f, ClampMax=1.0f))
+	float BrushHardness = 0.5f;
 
-	/** 步骤：碰撞绘制（将玩家位置绘制到碰撞 RT） */
-	void StepCollisionPainter(FVector2D PlayerUV, FVector2D PlayerVelocityEncoded, float DeltaTime);
-	/** 步骤：密度注入（将碰撞 RT 中的密度写入密度场） */
-	void StepInjectDensity(FVector2D PlayerUV, FVector2D PlayerVelocityEncoded);
-	/** 步骤：平流 */
-	void StepAdvection(UTextureRenderTarget2D* Src, UTextureRenderTarget2D*& DstRead, UTextureRenderTarget2D*& DstWrite, float DeltaTime);
-	/** 步骤：外力合成与梯度 */
-	void StepCompositeGradient(float DeltaTime);
-	/** 步骤：散度计算 */
-	void StepDivergence();
-	/** 步骤：压力求解（迭代） */
-	void StepPressureSolve();
-	/** 更新平面显示 */
-	void UpdateDisplay();
+	// ---- 追踪 ----
+	UPROPERTY(EditAnywhere, Category = "Tracing")
+	TArray<TEnumAsByte<EObjectTypeQuery>> ObjectTypes;
 
-	/** 记录上一帧玩家位置，用于计算速度 */
-	FVector LastPlayerWorldPos = FVector::ZeroVector;
+	UPROPERTY(EditAnywhere, Category = "Tracing")
+	float TraceDistance = 5000.0f;
+
+	/** 平面世界尺寸（影响 UV 映射） */
+	UPROPERTY(EditAnywhere, Category = "Tracing",
+		meta=(ClampMin=1.0f))
+	float PlaneWorldSize = 2000.0f;
+
+	/** 最大编码速度 */
+	UPROPERTY(EditAnywhere, Category = "Tracing",
+		meta=(ClampMin=1.0f))
+	float MaxVelocity = 500.0f;
+
+	// ---- 材质 ----
+	UPROPERTY(EditAnywhere, Category = "Materials")
+	class UMaterialInstance* CollisionPainterDotMat = nullptr;
+
+	UPROPERTY(EditAnywhere, Category = "Materials")
+	class UMaterialInstance* CollisionPainterLineMat = nullptr;
+
+	UPROPERTY(EditAnywhere, Category = "Materials")
+	class UMaterialInstance* AdvectionMat = nullptr;
+
+	UPROPERTY(EditAnywhere, Category = "Materials")
+	class UMaterialInstance* CompositeGradientMat = nullptr;
+
+	UPROPERTY(EditAnywhere, Category = "Materials")
+	class UMaterialInstance* DivergenceMat = nullptr;
+
+	UPROPERTY(EditAnywhere, Category = "Materials")
+	class UMaterialInstance* PressureSolverMat = nullptr;
+
+	UPROPERTY(EditAnywhere, Category = "Materials")
+	class UMaterialInstance* DisplayMat = nullptr;
+
+	// ---- Debug ----
+	UPROPERTY(EditAnywhere, Category = "Debug")
+	bool bShowDebugMessages = false;
+
+protected:
+	/** 将 Actor 属性同步到组件（在 BeginPlay / OnConstruction 时调用） */
+	void SyncPropertiesToComponent();
 };

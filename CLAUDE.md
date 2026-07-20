@@ -31,7 +31,7 @@ To load a toolset: use `load_toolset` with the name from `list_toolsets`, then c
 
 ### Launch the project in UE Editor
 ```
-"C:\Program Files\Epic Games\UE_5.8\Engine\Binaries\Win64\UnrealEditor.exe" "E:\Unreal\Projects\MyProject_5_8\MyProject_5_8.uproject"
+"E:\Unreal\UE_5.8\Engine\Binaries\Win64\UnrealEditor.exe" "E:\Unreal\Projects\MyProject_5_8\MyProject_5_8.uproject"
 ```
 
 ### Launch Claude Code with this project
@@ -48,6 +48,36 @@ py "Content/Python/create_dissolve_material.py"
 
 ### Generate Visual Studio project files
 Generate with: right-click `.uproject` > "Generate Visual Studio project files"
+
+## C++ Source Structure
+
+All fluid simulation C++ code is under `Source/MyProject_5_8/FluidTest/`:
+
+| File | Purpose |
+|---|---|
+| `FluidTest/MyNinjaLiveComponent.h/.cpp` | C++ ActorComponent (UMyNinjaLiveComponent) — GPU fluid simulation pipeline, line-trace interaction, render target management. |
+| `FluidTest/SimpleFluidActor.h/.cpp` | Wrapper Actor (ASimpleFluidActor) that owns a UMyNinjaLiveComponent + display plane + volumes. Reference: `/Game/FluidNinjaLive/NinjaLive.NinjaLive`. |
+| `MyActor.h/.cpp` | Base actor class |
+
+### Using MyNinjaLiveComponent standalone
+
+Attach it to any Actor in C++ or Blueprint:
+
+```cpp
+// C++ — attach to any Actor
+UMyNinjaLiveComponent* FluidComp = CreateDefaultSubobject<UMyNinjaLiveComponent>(TEXT("MyNinjaLive"));
+FluidComp->AdvectionMat = ...;  // assign materials in constructor
+```
+
+In Blueprint, add `MyNinjaLiveComponent` from the "FluidNinja" category.
+
+### Using ASimpleFluidActor (wrapper)
+
+Place `BP_SimpleFluidActor` (or the C++ class directly) in the level. It exposes the key simulation parameters in the Details panel and forwards them to its internal `UMyNinjaLiveComponent`.
+
+## Building
+
+Generate Visual Studio project files: right-click `.uproject` > "Generate Visual Studio project files", then build from VS or compile from the UE Editor.
 
 ## Content Structure
 
