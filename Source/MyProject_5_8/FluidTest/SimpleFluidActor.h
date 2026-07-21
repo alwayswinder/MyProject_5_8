@@ -69,21 +69,21 @@ public:
 	UPROPERTY(EditAnywhere, Category = "NinjaLive|Activation")
 	ETraceMeshInactiveBehaviour TraceMeshInactiveBehaviour = ETraceMeshInactiveBehaviour::KeepVisible;
 
-	/** BP TraceMeshSize = (1,1,1) — DisplayPlane scale */
+	/** BP TraceMeshSize = (20.5,20.5,1) — DisplayPlane scale */
 	UPROPERTY(EditAnywhere, Category = "NinjaLive|Interaction")
-	FVector TraceMeshSize = FVector(1.0f, 1.0f, 1.0f);
+	FVector TraceMeshSize = FVector(20.5f, 20.5f, 1.0f);
 
 	/** BP SimActivatedByPawnProximity = false */
 	UPROPERTY(EditAnywhere, Category = "NinjaLive|Activation")
 	bool SimActivatedByPawnProximity = false;
 
-	/** BP ActivationVolumeSize = (50,50,50) */
+	/** BP ActivationVolumeSize = (80,80,50) */
 	UPROPERTY(EditAnywhere, Category = "NinjaLive|Activation")
-	FVector ActivationVolumeSize = FVector(50.0f, 50.0f, 50.0f);
+	FVector ActivationVolumeSize = FVector(80.0f, 80.0f, 50.0f);
 
-	/** BP InteractionVolumeSize = (1,1,1) */
+	/** BP InteractionVolumeSize = (20.5,20.5,0.1) */
 	UPROPERTY(EditAnywhere, Category = "NinjaLive|Interaction")
-	FVector InteractionVolumeSize = FVector(1.0f, 1.0f, 1.0f);
+	FVector InteractionVolumeSize = FVector(20.5f, 20.5f, 0.1f);
 
 	UPROPERTY(EditAnywhere, Category = "NinjaLive|Interaction")
 	FName InteractionVolumeTemplate = "InteractionVolume";

@@ -151,23 +151,8 @@ void UMyNinjaLiveComponent::TickComponent(float DeltaTime, ELevelTick TickType,
 		if (!bPawnInsideBounds) return;
 	}
 
-	// 计算玩家 UV (用作相机交互)
-	{
-		APawn* P = UGameplayStatics::GetPlayerPawn(this, 0);
-		if (P)
-		{
-			FVector2D UV = WorldToSimUV(P->GetActorLocation());
-			UV.X = FMath::Clamp(UV.X, 0.0f, 1.0f);
-			UV.Y = FMath::Clamp(UV.Y, 0.0f, 1.0f);
-			CameraTraceHitUV = UV;
-			CameraTraceHitVelocity = P->GetVelocity();
-			bCameraTraceHit = (UV.X > 0.001f && UV.X < 0.999f && UV.Y > 0.001f && UV.Y < 0.999f);
-		}
-		else
-		{
-			bCameraTraceHit = false;
-		}
-	}
+	// 相机 LineTrace 交互 (对齐 BP HandleCameraLineTrace)
+	HandleCameraLineTrace(DeltaTime);
 
 	// 运行仿真管线
 	RunSimulationPipeline(DeltaTime);
@@ -345,7 +330,24 @@ void UMyNinjaLiveComponent::SetupDisplay()
 
 	ExternalDisplayPlane->SetMaterial(0, MID_ActiveDisplay);
 
-	// 绑定纹理参数
+	// 强制设置最常见纹理参数名，确保至少能显示
+	if (RT_Output)
+	{
+		MID_ActiveDisplay->SetTextureParameterValue(TEXT("VelocityDensityBuffer"), RT_Output);
+		MID_ActiveDisplay->SetTextureParameterValue(TEXT("Texture"), RT_Output);
+		MID_ActiveDisplay->SetTextureParameterValue(TEXT("DensityBuffer"), RT_Output);
+	}
+	if (RT_Painter)
+	{
+		MID_ActiveDisplay->SetTextureParameterValue(TEXT("PaintBuffer"), RT_Painter);
+	}
+	if (RT_PressureDivergence)
+	{
+		MID_ActiveDisplay->SetTextureParameterValue(TEXT("PressureBuffer"), RT_PressureDivergence);
+		MID_ActiveDisplay->SetTextureParameterValue(TEXT("DivergenceBuffer"), RT_PressureDivergence);
+	}
+
+	// 然后遍历材质声明的纹理参数做精确匹配
 	TArray<FMaterialParameterInfo> TexParamInfos;
 	TArray<FGuid> TexParamGuids;
 	MID_ActiveDisplay->GetAllTextureParameterInfo(TexParamInfos, TexParamGuids);
@@ -353,14 +355,22 @@ void UMyNinjaLiveComponent::SetupDisplay()
 	for (const FMaterialParameterInfo& Info : TexParamInfos)
 	{
 		FName ParamName = Info.Name;
+		FString NameStr = ParamName.ToString();
 		UTexture* Target = nullptr;
-		if (ParamName == TEXT("VelocityDensityBuffer") || ParamName == TEXT("Texture"))
+
+		if (NameStr.Contains(TEXT("VelocityDensity")) ||
+			NameStr.Contains(TEXT("DensityBuffer")) ||
+			NameStr.Contains(TEXT("VelocityBuffer")) ||
+			NameStr.Contains(TEXT("MainBuffer")) ||
+			NameStr.Equals(TEXT("Texture")) ||
+			NameStr.Equals(TEXT("tex")))
 			Target = RT_Output;
-		else if (ParamName == TEXT("PaintBuffer"))
+		else if (NameStr.Contains(TEXT("Paint")) ||
+				 NameStr.Contains(TEXT("Painter")) ||
+				 NameStr.Contains(TEXT("Collision")))
 			Target = RT_Painter;
-		else if (ParamName == TEXT("PressureBuffer"))
-			Target = RT_PressureDivergence;
-		else if (ParamName == TEXT("DivergenceBuffer"))
+		else if (NameStr.Contains(TEXT("Pressure")) ||
+				 NameStr.Contains(TEXT("Divergence")))
 			Target = RT_PressureDivergence;
 
 		if (Target)
@@ -382,11 +392,10 @@ FVector2D UMyNinjaLiveComponent::WorldToSimUV(const FVector& WorldPos) const
 {
 	if (!GetOwner()) return FVector2D(0.5f, 0.5f);
 	FVector Origin = GetOwner()->GetActorLocation();
-	FVector OffsetOrigin = Origin + FVector(OffsetFromSimAreaMotion, OffsetFromSimAreaMotion, 0.0f);
 	float Half = PlaneWorldSize * 0.5f;
 	return FVector2D(
-		(WorldPos.X - (OffsetOrigin.X - Half)) / PlaneWorldSize,
-		(WorldPos.Y - (OffsetOrigin.Y - Half)) / PlaneWorldSize
+		(WorldPos.X - (Origin.X - Half)) / PlaneWorldSize,
+		(WorldPos.Y - (Origin.Y - Half)) / PlaneWorldSize
 	);
 }
 
@@ -493,20 +502,92 @@ void UMyNinjaLiveComponent::CheckLOD(float DeltaTime)
 }
 
 // ============================================================================
-// 预设加载
+// 预设加载 — 从 DataTable 读取行数据并应用到材质
 // ============================================================================
 void UMyNinjaLiveComponent::LoadPreset()
 {
-	if (!DefaultPreset || !bForceAutoLoadPreset)
+	if (!DefaultPreset)
 	{
-		UE_LOG(LogTemp, Log, TEXT("[MyNinjaLiveComponent] Preset: not loaded (DT=%s, Force=%d)"),
-			DefaultPreset ? *DefaultPreset->GetName() : TEXT("NULL"), bForceAutoLoadPreset);
+		UE_LOG(LogTemp, Log, TEXT("[MyNinjaLiveComponent] No preset DataTable assigned"));
 		return;
 	}
 
-	UE_LOG(LogTemp, Log, TEXT("[MyNinjaLiveComponent] Loading preset from %s (filter: %s)"),
-		*DefaultPreset->GetName(), *PresetNameFilterCriteria.ToString());
+	const UScriptStruct* RowStruct = DefaultPreset->GetRowStruct();
+	if (!RowStruct)
+	{
+		ApplyPresetParameters();
+		return;
+	}
+
+	// 找出 NinjaPreset 结构的第一个 float/double 字段（即"值"字段）
+	FFloatProperty* ValFloatProp = nullptr;
+	FDoubleProperty* ValDoubleProp = nullptr;
+	for (TFieldIterator<FFloatProperty> It(RowStruct); It; ++It) { ValFloatProp = *It; break; }
+	if (!ValFloatProp)
+	{
+		for (TFieldIterator<FDoubleProperty> It(RowStruct); It; ++It) { ValDoubleProp = *It; break; }
+	}
+
+	if (!ValFloatProp && !ValDoubleProp)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[MyNinjaLiveComponent] NinjaPreset has no float field"));
+		bPresetLoaded = true;
+		ApplyPresetParameters();
+		return;
+	}
+
+	// 参数名=行名, 读取该行的 float 值
+	auto RP = [&](const char* RowName, float Default) -> float
+	{
+		FName RN(RowName);
+		uint8* RD = DefaultPreset->FindRowUnchecked(RN);
+		if (!RD) return Default;
+		if (ValFloatProp) return ValFloatProp->GetPropertyValue_InContainer(RD);
+		return (float)ValDoubleProp->GetPropertyValue_InContainer(RD);
+	};
+
+	UE_LOG(LogTemp, Log, TEXT("[MyNinjaLiveComponent] Loading preset from %s"),
+		*DefaultPreset->GetName());
+
+	Preset_VeloStrength           = RP("VeloStrength",          1.0f);
+	Preset_VeloOffsetX            = RP("VeloOffsetX",           0.0f);
+	Preset_VeloOffsetY            = RP("VeloOffsetY",           0.0f);
+	Preset_VeloRotate             = RP("VeloRotate",            0.0f);
+	Preset_VeloAmpNoise           = RP("VeloAmpNoise",          0.5f);
+	Preset_VeloDirNoise           = RP("VeloDirNoise",          0.5f);
+	Preset_Speed                  = RP("Speed",                 1.0f);
+	Preset_Divergence             = RP("Divergence",            1.0f);
+	Preset_InputFeedback          = RP("InputFeedback",         0.2f);
+	Preset_FlowFeedback           = RP("FlowFeedback",          0.5f);
+	Preset_VeloFromSimAreaMotion  = RP("VeloFromSimAreaMotion", 0.0f);
+	Preset_VeloFromBrushMotion    = RP("VeloFromBrushMotion",   1.0f);
+	Preset_EdgeMaskWidth          = RP("EdgeMaskWidth",         EdgeMaskWidth);
+	Preset_BrushSize              = RP("BrushSize",             BrushSize);
+	Preset_BrushStrength          = RP("BrushStrength",         BrushStrength);
+
 	bPresetLoaded = true;
+
+	// 将预设值应用到材质
+	ApplyPresetParameters();
+}
+
+// ----------------------------------------------------------------------------
+// 将 Preset_* 值应用到材质参数
+// ----------------------------------------------------------------------------
+void UMyNinjaLiveComponent::ApplyPresetParameters()
+{
+	// CompositeGradient 材质参数
+	if (MID_CompositeGradient)
+	{
+		MID_CompositeGradient->SetScalarParameterValue(TEXT("VeloInputSelect"), 1.0f); // 启用 velocity 生成
+		MID_CompositeGradient->SetScalarParameterValue(TEXT("VeloStrength"),   Preset_VeloStrength);
+		MID_CompositeGradient->SetScalarParameterValue(TEXT("VeloOffsetX"),    Preset_VeloOffsetX);
+		MID_CompositeGradient->SetScalarParameterValue(TEXT("VeloOffsetY"),    Preset_VeloOffsetY);
+		MID_CompositeGradient->SetScalarParameterValue(TEXT("VeloRotate"),     Preset_VeloRotate);
+		MID_CompositeGradient->SetScalarParameterValue(TEXT("VeloAmpNoise"),   Preset_VeloAmpNoise);
+		MID_CompositeGradient->SetScalarParameterValue(TEXT("VeloFromBrushMotion"), Preset_VeloFromBrushMotion);
+		MID_CompositeGradient->SetScalarParameterValue(TEXT("Dissipation"),    DensityDissipation);
+	}
 }
 
 // ============================================================================
@@ -562,8 +643,7 @@ void UMyNinjaLiveComponent::StepCompositeGradient(float DeltaTime)
 	MID_CompositeGradient->SetTextureParameterValue(TEXT("VeloInputTexture"), RT_Composite);
 	MID_CompositeGradient->SetTextureParameterValue(TEXT("VeloPainter"), RT_Painter);
 	MID_CompositeGradient->SetScalarParameterValue(TEXT("DeltaTime"), DeltaTime);
-	MID_CompositeGradient->SetScalarParameterValue(TEXT("BrushVeloNoise"), AdjustPainter_V2_BrushVeloNoise);
-	MID_CompositeGradient->SetScalarParameterValue(TEXT("VeloNoiseFreq"), BrushVelocityNoiseFreq);
+	MID_CompositeGradient->SetScalarParameterValue(TEXT("Dissipation"), DensityDissipation);
 
 	UKismetRenderingLibrary::DrawMaterialToRenderTarget(this, RT_WorkBuffer, MID_CompositeGradient);
 }
@@ -578,10 +658,7 @@ void UMyNinjaLiveComponent::StepAdvection(float DeltaTime)
 
 	MID_Advection->SetTextureParameterValue(TEXT("Texture"), RT_Composite);
 	MID_Advection->SetScalarParameterValue(TEXT("DeltaTime"), DeltaTime);
-	MID_Advection->SetScalarParameterValue(TEXT("Dissipation"), Dissipation);
-
-	if (CollisionMask)
-		MID_Advection->SetTextureParameterValue(TEXT("CollisionMask"), CollisionMask);
+	MID_Advection->SetScalarParameterValue(TEXT("Dissipation"), DensityDissipation);
 
 	UKismetRenderingLibrary::DrawMaterialToRenderTarget(this, RT_Advection, MID_Advection);
 }
@@ -595,17 +672,18 @@ void UMyNinjaLiveComponent::StepDivergence()
 	if (!MID_Divergence || !RT_Composite || !RT_PressureDivergence) return;
 
 	MID_Divergence->SetTextureParameterValue(TEXT("Texture"), RT_Composite);
+	MID_Divergence->SetScalarParameterValue(TEXT("Divergence"), Preset_Divergence);
 
 	UKismetRenderingLibrary::DrawMaterialToRenderTarget(this, RT_PressureDivergence, MID_Divergence);
 }
 
 // --------------------------------------------------------------------------
 // Step 5: 压力求解 — 解泊松方程 ∇²p = ∇·v
-//   Solver2 (默认, 1次迭代+kernel reduction):
+//   Solver2 (默认):
 //     Clear → PressureSolverInit(divergence→pressure)
-//     → PressureSolverIter × PressureSolver2_MaxIterations
-//   Solver1 (可选, N次 Jacobi 迭代):
-//     Clear → PressureSolverInit → PressureSolverIter × N
+//     → 使用 Solver1 材质迭代 × PressureSolver2_MaxIterations → 完成
+//   Solver1 (可选):
+//     Clear → PressureSolverInit → PressureSolverIter × Solver1_Iterations
 // --------------------------------------------------------------------------
 void UMyNinjaLiveComponent::StepPressureSolve()
 {
@@ -615,11 +693,10 @@ void UMyNinjaLiveComponent::StepPressureSolve()
 	UKismetRenderingLibrary::ClearRenderTarget2D(this, RT_PressureDivergenceTemp, FLinearColor::Black);
 
 	// Step1: 初始化解 (MI_Pressure_Solver2_Step1)
-	MID_PressureSolverInit->SetTextureParameterValue(TEXT("Divergence"), RT_PressureDivergence);
-	MID_PressureSolverInit->SetTextureParameterValue(TEXT("Texture"), RT_PressureDivergenceTemp);
+	MID_PressureSolverInit->SetTextureParameterValue(TEXT("Texture"), RT_PressureDivergence);
 	UKismetRenderingLibrary::DrawMaterialToRenderTarget(this, RT_PressureDivergenceTemp, MID_PressureSolverInit);
 
-	// 迭代求解
+	// 迭代求解 — 两种 Solver 都使用同一迭代材质 MI_Pressure_Solver1
 	int32 IterCount = bUsePressureSolver1
 		? PressureSolver1_MaxIterations
 		: PressureSolver2_MaxIterations;
@@ -648,10 +725,10 @@ void UMyNinjaLiveComponent::StepPressureCorrection()
 	UMaterialInstanceDynamic* MID_Correction = MID_PressureCorrection ? MID_PressureCorrection : MID_CompositeGradient;
 	if (!MID_Correction) return;
 
-	// PressureCorrection 材质也使用 VeloInputTexture + VeloPainter 参数名
 	MID_Correction->SetTextureParameterValue(TEXT("VeloInputTexture"), RT_Composite);
 	MID_Correction->SetTextureParameterValue(TEXT("VeloPainter"), RT_PressureDivergence);
 	MID_Correction->SetScalarParameterValue(TEXT("DeltaTime"), 1.0f);
+	MID_Correction->SetScalarParameterValue(TEXT("Dissipation"), DensityDissipation);
 
 	UKismetRenderingLibrary::DrawMaterialToRenderTarget(this, RT_WorkBuffer, MID_Correction);
 }
@@ -717,6 +794,8 @@ void UMyNinjaLiveComponent::StepUpdateDisplay()
 	if (MID_ActiveDisplay)
 	{
 		MID_ActiveDisplay->SetTextureParameterValue(TEXT("VelocityDensityBuffer"), RT_Output);
+		MID_ActiveDisplay->SetTextureParameterValue(TEXT("Texture"), RT_Output);
+		MID_ActiveDisplay->SetTextureParameterValue(TEXT("DensityBuffer"), RT_Output);
 		if (RT_Painter)
 			MID_ActiveDisplay->SetTextureParameterValue(TEXT("PaintBuffer"), RT_Painter);
 	}
@@ -755,17 +834,37 @@ void UMyNinjaLiveComponent::CopyRT(UTextureRenderTarget2D* Src, UTextureRenderTa
 // ============================================================================
 void UMyNinjaLiveComponent::RunSimulationPipeline(float DeltaTime)
 {
-	// ---- 种子帧: 初始密度 ----
-	if (TickFrameCount < 3)
+	// ---- 种子帧: 初始密度 + velocity ----
+	if (TickFrameCount < 5)
 	{
 		if (TickFrameCount == 0)
 		{
-			StepInjectDensityCanvas(FVector2D(0.5f, 0.5f), FVector2D(0.5f, 0.5f), 0.5f);
-			StepInjectDensityCanvas(FVector2D(0.3f, 0.5f), FVector2D(0.52f, 0.5f), 0.3f);
-			StepInjectDensityCanvas(FVector2D(0.7f, 0.5f), FVector2D(0.48f, 0.5f), 0.3f);
+			// 注入带 velocity 的密度：左侧向右，右侧向左，形成剪切层
+			StepInjectDensityCanvas(FVector2D(0.3f, 0.5f), EncodeVelocity(FVector(200, 0, 0)), 0.5f);
+			StepInjectDensityCanvas(FVector2D(0.7f, 0.5f), EncodeVelocity(FVector(-200, 0, 0)), 0.5f);
+			StepInjectDensityCanvas(FVector2D(0.5f, 0.3f), EncodeVelocity(FVector(0, 200, 0)), 0.3f);
+			StepInjectDensityCanvas(FVector2D(0.5f, 0.7f), EncodeVelocity(FVector(0, -200, 0)), 0.3f);
+
+			// 种子帧直接复制到输出
+			if (RT_Composite && RT_Output && MID_Display)
+			{
+				MID_Display->SetTextureParameterValue(TEXT("VelocityDensityBuffer"), RT_Composite);
+				UKismetRenderingLibrary::DrawMaterialToRenderTarget(this, RT_Output, MID_Display);
+			}
+			if (MID_ActiveDisplay && RT_Output)
+			{
+				MID_ActiveDisplay->SetTextureParameterValue(TEXT("VelocityDensityBuffer"), RT_Output);
+				MID_ActiveDisplay->SetTextureParameterValue(TEXT("Texture"), RT_Output);
+			}
 		}
+
+		// 种子帧期间也运行完整管线（让 velocity 开始演化）
 		StepAdvection(DeltaTime);
 		CopyRT(RT_Advection, RT_Composite);
+		StepDivergence();
+		StepPressureSolve();
+		StepPressureCorrection();
+		CopyRT(RT_WorkBuffer, RT_Composite);
 		StepUpdateDisplay();
 		return;
 	}
@@ -822,20 +921,7 @@ void UMyNinjaLiveComponent::RunSimulationPipeline(float DeltaTime)
 // ============================================================================
 void UMyNinjaLiveComponent::PlayerStepInteraction(float DeltaTime)
 {
-	APawn* PlayerPawn = UGameplayStatics::GetPlayerPawn(this, 0);
-	if (!PlayerPawn) return;
-
-	FVector PlayerVelocity = PlayerPawn->GetVelocity();
-	float Speed = PlayerVelocity.Size();
-
-	if (Speed < DampenBrushBelowThisVelocity) return;
-
-	FVector2D SimUV = WorldToSimUV(PlayerPawn->GetActorLocation());
-	SimUV.X = FMath::Clamp(SimUV.X, 0.0f, 1.0f);
-	SimUV.Y = FMath::Clamp(SimUV.Y, 0.0f, 1.0f);
-
-	FVector2D VelEnc = EncodeVelocity(PlayerVelocity);
-	StepInjectDensityCanvas(SimUV, VelEnc);
+	// 已通过 HandleCameraLineTrace 处理交互
 }
 
 // ============================================================================
@@ -875,7 +961,7 @@ void UMyNinjaLiveComponent::HandleCameraLineTrace(float DeltaTime)
 			FVector CombinedVelocity = CameraTraceHitVelocity +
 				FVector(UVDelta.X * MaxVelocity, UVDelta.Y * MaxVelocity, 0.0f);
 			FVector2D VelEnc = EncodeVelocity(CombinedVelocity);
-			StepCollisionPainter(CameraTraceHitUV, VelEnc, DeltaTime);
+			// 碰撞绘制在管线 Step 1 中统一执行，这里只记录交互点
 			AddInteractionPoint(CameraTraceHitUV, CombinedVelocity);
 		}
 		CameraTraceLastUV = CameraTraceHitUV;

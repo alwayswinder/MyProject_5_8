@@ -71,9 +71,9 @@ ASimpleFluidActor::ASimpleFluidActor()
 	static ConstructorHelpers::FObjectFinder<UMaterialInstance> OM1(
 		TEXT("/Game/FluidNinjaLive/OutputMaterials/Instance_Buffers/MI_DensityBuffer_Translucent.MI_DensityBuffer_Translucent"));
 
-	// --- 预设 DataTable (对齐 BP DT_NinjaLive_Default) ---
+	// --- 预设 DataTable (对齐 BP: 参考配置使用 DT_Usecase_Pool2) ---
 	static ConstructorHelpers::FObjectFinder<UDataTable> PresetDT(
-		TEXT("/Game/FluidNinjaLive/Presets/DT_NinjaLive_Default.DT_NinjaLive_Default"));
+		TEXT("/Game/FluidNinjaLive/Presets/DT_Usecase_Pool2.DT_Usecase_Pool2"));
 
 	// --- 不活跃灰化材质 ---
 	static ConstructorHelpers::FObjectFinder<UMaterialInstance> InactiveMat(
@@ -133,7 +133,7 @@ ASimpleFluidActor::ASimpleFluidActor()
 
 	// 预设
 	if (PresetDT.Succeeded()) NinjaLiveComponent->DefaultPreset = PresetDT.Object;
-	NinjaLiveComponent->PresetNameFilterCriteria = TEXT("NinjaLive");
+	NinjaLiveComponent->PresetNameFilterCriteria = TEXT("Usecase");
 	NinjaLiveComponent->bForceAutoLoadPreset = true;
 
 	// 不活跃材质

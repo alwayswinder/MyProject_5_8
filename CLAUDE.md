@@ -97,13 +97,17 @@ Generate Visual Studio project files: right-click `.uproject` > "Generate Visual
 
 Additional MCP server plugin (`McpAutomationBridge`) providing extended editor automation tools beyond the built-in MCP:
 
-- **Transport**: Native MCP Streamable HTTP (no Node.js needed)
-- **URL**: `http://localhost:3000/mcp`
+**Architecture**: The UE plugin runs a WebSocket server (ports 8090/8091) with a custom action-based protocol. A Node.js bridged server (`unreal-engine-mcp-server`) translates between standard MCP JSON-RPC and the plugin's protocol.
+
+- **Transport**: stdio (via `npx unreal-engine-mcp-server`)
+- **Node.js requirement**: Node.js 18+ (needed for the bridge)
 - **Config**: Edit → Project Settings → Plugins → MCP Automation Bridge
 - **Security**: Loopback-only by default (127.0.0.1); enable LAN access via `bAllowNonLoopback`
-- **Tools**: Asset management, actor control, level management, animation, Niagara, sequencer, Blueprint graphs, materials, AI, audio, and more
+- **Tools**: 23 standard MCP tools across asset management, actor control, level management, animation, Niagara, sequencer, Blueprint graphs, materials, AI, audio, and more
 
-Registered in Claude Code as transport `http` at `http://localhost:3000/mcp`.
+Registered in Claude Code as `mcp-automation-bridge` with stdio transport running `npx.cmd unreal-engine-mcp-server`.
+
+**Note**: Use `npx.cmd` instead of `npx` in the config because on Windows, `npx` is a PowerShell script (`npx.ps1`) that Claude Code may not handle correctly for stdio MCP transport.
 
 ## Key Config
 

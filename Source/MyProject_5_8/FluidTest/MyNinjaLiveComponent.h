@@ -100,14 +100,14 @@ public:
 		meta=(ClampMin=0.0f))
 	float TickRateCustom = 0.016f;
 
-	// ---- 仿真分辨率 (BP 默认 256×256) ----
+	// ---- 仿真分辨率 (参考配置 1600×1600) ----
 	UPROPERTY(EditAnywhere, Category = "MyNinjaLive|Simulation",
 		meta=(ClampMin=64, ClampMax=4096))
-	int32 ResolutionX = 256;
+	int32 ResolutionX = 1600;
 
 	UPROPERTY(EditAnywhere, Category = "MyNinjaLive|Simulation",
 		meta=(ClampMin=64, ClampMax=4096))
-	int32 ResolutionY = 256;
+	int32 ResolutionY = 1600;
 
 	/** BP MaxSamplingFPS = 60 */
 	UPROPERTY(EditAnywhere, Category = "MyNinjaLive|Simulation",
@@ -157,10 +157,15 @@ public:
 	UPROPERTY(EditAnywhere, Category = "MyNinjaLive|LOD")
 	float LOD_StepRange = 300.0f;
 
-	/** 密度消散率/帧 */
+	/** 密度消散率/帧 (BP 密度循环 0.99) */
 	UPROPERTY(EditAnywhere, Category = "MyNinjaLive|Simulation",
 		meta=(ClampMin=0.0f, ClampMax=1.0f))
-	float Dissipation = 0.99f;
+	float DensityDissipation = 0.99f;
+
+	/** 速度消散率/帧 (BP 速度循环, 默认 1.0 = 无消散) */
+	UPROPERTY(EditAnywhere, Category = "MyNinjaLive|Simulation",
+		meta=(ClampMin=0.0f, ClampMax=1.0f))
+	float VelocityDissipation = 1.0f;
 
 	// ---- 碰撞检测 (对齐 BP TraceChannels) ----
 	UPROPERTY(EditAnywhere, Category = "MyNinjaLive|Tracing")
@@ -276,6 +281,10 @@ public:
 	/** BP ForceAutoLoadPreset = true */
 	UPROPERTY(EditAnywhere, Category = "MyNinjaLive|Preset")
 	bool bForceAutoLoadPreset = true;
+
+	/** 预设行名称 (留空则用 PresetNameFilterCriteria 在表中搜索) */
+	UPROPERTY(EditAnywhere, Category = "MyNinjaLive|Preset")
+	FName PresetRowName = NAME_None;
 
 	// ---- 杂项 (对齐 BP) ----
 	UPROPERTY(EditAnywhere, Category = "MyNinjaLive|Misc")
@@ -393,7 +402,7 @@ public:
 
 	UPROPERTY(EditAnywhere, Category = "MyNinjaLive|Output",
 		meta=(ClampMin=1.0f))
-	float PlaneWorldSize = 8200.0f;
+	float PlaneWorldSize = 10000.0f;
 
 	UPROPERTY(EditAnywhere, Category = "MyNinjaLive|Output")
 	float MaxVelocity = 500.0f;
@@ -536,6 +545,11 @@ protected:
 	float Preset_FlowFeedback = 0.5f;
 	float Preset_VeloFromSimAreaMotion = 0.0f;
 	float Preset_VeloFromBrushMotion = 1.0f;
+	float Preset_DensityDissipation = 0.99f;
+	float Preset_VelocityDissipation = 1.0f;
+	float Preset_EdgeMaskWidth = 0.25f;
+	float Preset_BrushSize = 0.1f;
+	float Preset_BrushStrength = 0.5f;
 
 	// =============================================================
 	// 内部状态
@@ -602,6 +616,7 @@ protected:
 	void CheckPawnProximity();
 	void CheckLOD(float DeltaTime);
 	void LoadPreset();
+	void ApplyPresetParameters();
 
 	/** 通过 Advection MID 复制 RT (pass-through, Δt=0, dissipation=1) */
 	void CopyRT(UTextureRenderTarget2D* Src, UTextureRenderTarget2D* Dst);
