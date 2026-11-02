@@ -8,7 +8,7 @@ public class MyProject_5_8 : ModuleRules
 	{
 		PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
 	
-		PublicDependencyModuleNames.AddRange(new string[] { "Core", "CoreUObject", "Engine", "InputCore", "RHI" });
+		PublicDependencyModuleNames.AddRange(new string[] { "Core", "CoreUObject", "Engine", "InputCore", "RHI", "RuntimeMetaHumanLipSync" });
 
 		PrivateDependencyModuleNames.AddRange(new string[] {  });
 	}

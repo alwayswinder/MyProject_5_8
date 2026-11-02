@@ -15,6 +15,10 @@
 	],
 	"Plugins": [
 		{
+			"Name": "KawaiiPhysics",
+			"Enabled": true
+		},
+		{
 			"Name": "ModelingToolsEditorMode",
 			"Enabled": true,
 			"TargetAllowList": [
@@ -153,6 +157,10 @@
 		},
 		{
 			"Name": "PCGToolset",
+			"Enabled": true
+		},
+		{
+			"Name": "RuntimeMetaHumanLipSync",
 			"Enabled": true
 		}
 	]
