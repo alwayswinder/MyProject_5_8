@@ -144,3 +144,71 @@ $proj = "E:\Unreal\Projects\MyProject_5_8\MyProject_5_8.uproject"
    `09 - Default` 是 3ds Max 的默认材质名），其余 11 个槽正常指向 `Seven_*_Inst`。
 3. 贴图资产里有 `/Game/Developers/jinzhang/Seven_1` 这类**源文件路径**残留（贴图的
    Source File 记录），运行时不加载，无害；想要干净可以重新导入贴图。
+
+## 第二轮：2026-11-02 重新 merge
+
+用户在 `SSMainline` 里更新了内容后重新 merge 了一次，于是：
+
+1. 重存结果被覆盖。带上来的 55 个小资产又全部变回 `5.8.4-2147650534+++ScissorSeven+Game+Mainline`，
+   一条都加载不了。**这是预期行为：merge 会覆盖本地的重存结果，每次 merge 都要重跑
+   `resave_sevgame.py`。**
+2. merge 不完整，缺 5 个关键文件（`Animations/` 整个目录都没带过来）：
+
+   | 缺的文件 | 源文件大小 | 源文件自己的版本标签 |
+   |---|---|---|
+   | `Mesh/Seven.uasset` | 7 671 630 | 5.7.4-dev_fight |
+   | `Mesh/Seven_Skeleton.uasset` | 75 997 | 5.7.4-dev_fight |
+   | `Mesh/Seven_PhysicsAsset.uasset` | 62 195 | 5.7.4-dev_fight |
+   | `Mesh/Seven_Hair_AnimBlueprint.uasset` | 337 481 | 5.7.4-dev_fight |
+   | `Animations/Atk/Atk_Idle01.uasset` | 928 045 | 5.7.4-dev_fight |
+
+   结论：源项目里角色本体这几个文件**一直没重存**，还停在 `++ScissorSeven+Game+dev_fight` 的
+   5.7.4 上。它们比 5.8.3 老，本来就能加载；真正的阻塞只有那 55 个被 5.8.4 存过的小资产。
+
+3. **新坑：只读属性。** 从源项目拷过来的这 5 个文件带 `ReadOnly`（源项目受源码管理），
+   重存时 `SavePackage` 直接报：
+
+   ```
+   LogSavePackage: Error: Cannot remove '...Seven_Skeleton.uasset' as it is read only!
+   ```
+
+   修法：拷完先清属性再重存。
+
+   ```powershell
+   Get-ChildItem Content\SevGame -Recurse -File -Include *.uasset,*.umap | Where-Object IsReadOnly | ForEach-Object { $_.IsReadOnly = $false }
+   ```
+
+4. 补齐 + 清属性后重跑：`ok=60 failed=0`，原厂校验下 `SEVCHECK: ===== ok=60 failed=0`。
+   备份：`Saved/Backup/SevGame_before_resave_20261102.zip`（28 MB）。
+
+5. **散落资产也跟着修了**：`Content/Developers/fulinhou/Skele/StaticMesh.uasset` 同样是这一批
+   进来的 5.8.4 资产（Seven 本体拆出来的**非蒙皮静态网格**，引用 9 个 `Seven_*_Inst` 材质）。
+   脚本支持换根目录，不用改代码：
+
+   ```powershell
+   $env:RESAVE_ROOT="/Game/Developers/fulinhou/Skele"
+   # 然后照下面跑 resave_sevgame.py / verify_sevgame.py
+   ```
+
+   修完 `Content` 全树 747 个包里「太新」的数量 = **0**。
+
+### 标准流程（每次 merge 后照抄）
+
+```powershell
+# 0. 关掉所有打开本项目的编辑器
+# 1. 清只读
+Get-ChildItem Content\SevGame -Recurse -File -Include *.uasset,*.umap | Where-Object IsReadOnly | ForEach-Object { $_.IsReadOnly = $false }
+# 2. 先看版本分布，确认哪些是新引擎存的
+python Scripts\audit_engver.py Content\SevGame
+# 3. 重存（日志找 SEVGAME: ===== SUMMARY ok=60 failed=0）
+# 4. 原厂校验（日志找 SEVCHECK: ===== ok=60 failed=0）
+```
+
+### 范围提醒
+
+源项目 `D:\Work\SSMainline\Game\Content\SevGame` 有 **30 656** 个资产（整套 UI / VFX / GAS /
+Montage / BP / 关卡序列…），本项目 `SevGame` 目前只有 **60** 个（`Art/MaterialLibrary` 全部 +
+`Art/Player/Seven/Mesh` 的 `Material`/`Texture`/本体 + 一个 `Atk_Idle01` 动画）。
+源里另有 3 个同类资产从没带过来（`Mesh/Material/Seven_Outline_Inst`、`Mesh/Texture/Seven_BodyCloth_Nor`、
+`Mesh/Texture/Seven_Face_Mask`），要的话单独拷。
+

@@ -70,6 +70,14 @@ void ASevenLipSyncActor::BeginPlay()
 		LipSync->WavFile = WavFile;
 		LipSync->LipSyncLookaheadMs = LipSyncLookaheadMs;
 		LipSync->Gain = LipSyncGain;
+		LipSync->JawOpenScale = LipSyncJawOpenScale;
+		LipSync->JawOpenMax = LipSyncJawOpenMax;
+		LipSync->RoundingScale = LipSyncRoundingScale;
+		LipSync->JawOpenFloor = LipSyncJawOpenFloor;
+		LipSync->OpenSpeed = LipSyncOpenSpeed;
+		LipSync->CloseSpeed = LipSyncCloseSpeed;
+		LipSync->LipFollowJaw = LipSyncLipFollowJaw;
+		LipSync->LogInterval = LipSyncLogInterval;
 	}
 
 	Super::BeginPlay();
@@ -85,13 +93,21 @@ void ASevenLipSyncActor::Tick(float DeltaSeconds)
 	{
 		LipSync->LipSyncLookaheadMs = LipSyncLookaheadMs;
 		LipSync->Gain = LipSyncGain;
+		LipSync->JawOpenScale = LipSyncJawOpenScale;
+		LipSync->JawOpenMax = LipSyncJawOpenMax;
+		LipSync->RoundingScale = LipSyncRoundingScale;
+		LipSync->JawOpenFloor = LipSyncJawOpenFloor;
+		LipSync->OpenSpeed = LipSyncOpenSpeed;
+		LipSync->CloseSpeed = LipSyncCloseSpeed;
+		LipSync->LipFollowJaw = LipSyncLipFollowJaw;
+		LipSync->LogInterval = LipSyncLogInterval;
 		LipSync->GateLowRms = LipSyncGateLowRms;
 		LipSync->GateHighRms = LipSyncGateHighRms;
 	}
 
-	if (ViewTargetLockTime > 0.0f)
+	if (ViewTargetLockSeconds > 0.0f)
 	{
-		ViewTargetLockTime -= DeltaSeconds;
+		ViewTargetLockSeconds -= DeltaSeconds;
 
 		// Keep re-asserting for a moment: the player controller may still be
 		// assigning its own view target right after possession.

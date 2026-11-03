@@ -1,6 +1,7 @@
 #include "SevenLipSyncComponent.h"
 
 #include "RealisticMetaHumanLipSyncGenerator.h"
+#include "Animation/AnimSequence.h"
 #include "Components/AudioComponent.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "GameFramework/Actor.h"
@@ -27,9 +28,11 @@ namespace SevenLipSyncPrivate
 	const FMorphMapping GMorphMappings[] =
 	{
 		// ---- jaw ----
-		// The model's jaw output is fairly conservative (~0.1-0.25 during speech),
-		// the ARKit jawOpen morph expects 0..1 for a full open, hence the boost.
-		{ TEXT("CTRL_C_jaw.ty"),                    TEXT("jawOpen"),                2.20f },
+		// The model's jaw output is conservative (~0.07-0.33 during speech), so it
+		// needs a boost - but only a mild one: at 2.2 jawOpen used to pin at 0.55-0.75
+		// on loud vowels, which reads as a gaping mouth on this stylised head.
+		// 1.2 keeps the peak around 0.4, and JawOpenMax caps the rest.
+		{ TEXT("CTRL_C_jaw.ty"),                    TEXT("jawOpen"),                1.20f },
 		{ TEXT("CTRL_C_jaw_fwdBack.ty"),            TEXT("jawForward"),             1.00f },
 		{ TEXT("CTRL_C_jaw.tx"),                    TEXT("jawRight"),               1.00f },
 
@@ -38,20 +41,23 @@ namespace SevenLipSyncPrivate
 		{ TEXT("CTRL_R_mouth_cornerPull.ty"),       TEXT("mouthSmileRight"),        1.00f },
 		{ TEXT("CTRL_L_mouth_cornerDepress.ty"),    TEXT("mouthFrownLeft"),         1.00f },
 		{ TEXT("CTRL_R_mouth_cornerDepress.ty"),    TEXT("mouthFrownRight"),        1.00f },
-		{ TEXT("CTRL_L_mouth_stretch.ty"),          TEXT("mouthStretchLeft"),       1.00f },
-		{ TEXT("CTRL_R_mouth_stretch.ty"),          TEXT("mouthStretchRight"),      1.00f },
+		{ TEXT("CTRL_L_mouth_stretch.ty"),          TEXT("mouthStretchLeft"),       0.50f },
+		{ TEXT("CTRL_R_mouth_stretch.ty"),          TEXT("mouthStretchRight"),      0.50f },
 		{ TEXT("CTRL_L_mouth_upperLipRaise.ty"),    TEXT("mouthUpperUpLeft"),       1.00f },
 		{ TEXT("CTRL_R_mouth_upperLipRaise.ty"),    TEXT("mouthUpperUpRight"),      1.00f },
-		{ TEXT("CTRL_L_mouth_lowerLipDepress.ty"),  TEXT("mouthLowerDownLeft"),     1.00f },
-		{ TEXT("CTRL_R_mouth_lowerLipDepress.ty"),  TEXT("mouthLowerDownRight"),    1.00f },
-		{ TEXT("CTRL_L_mouth_dimple.ty"),           TEXT("mouthDimpleLeft"),        1.00f },
-		{ TEXT("CTRL_R_mouth_dimple.ty"),           TEXT("mouthDimpleRight"),       1.00f },
-		{ TEXT("CTRL_L_mouth_sharpCornerPull.ty"),  TEXT("mouthSmileLeft"),         0.35f },
-		{ TEXT("CTRL_R_mouth_sharpCornerPull.ty"),  TEXT("mouthSmileRight"),        0.35f },
+		// lowerDown stacks with jawOpen on the same visual gap, so it gets trimmed too.
+		{ TEXT("CTRL_L_mouth_lowerLipDepress.ty"),  TEXT("mouthLowerDownLeft"),     0.60f },
+		{ TEXT("CTRL_R_mouth_lowerLipDepress.ty"),  TEXT("mouthLowerDownRight"),    0.60f },
+		{ TEXT("CTRL_L_mouth_dimple.ty"),           TEXT("mouthDimpleLeft"),        0.50f },
+		{ TEXT("CTRL_R_mouth_dimple.ty"),           TEXT("mouthDimpleRight"),       0.50f },
+		{ TEXT("CTRL_L_mouth_sharpCornerPull.ty"),  TEXT("mouthSmileLeft"),         0.15f },
+		{ TEXT("CTRL_R_mouth_sharpCornerPull.ty"),  TEXT("mouthSmileRight"),        0.15f },
 
-		// funnel: upper + lower corners
-		{ TEXT("CTRL_L_mouth_funnelU.ty"),          TEXT("mouthFunnel"),            0.50f },
-		{ TEXT("CTRL_L_mouth_funnelD.ty"),          TEXT("mouthFunnel"),            0.50f },
+		// funnel: upper + lower corners. Both rows sum into one morph, so 0.5 + 0.5
+		// used to saturate mouthFunnel on almost every vowel and turn the mouth into
+		// a round hole on top of the jaw drop.
+		{ TEXT("CTRL_L_mouth_funnelU.ty"),          TEXT("mouthFunnel"),            0.35f },
+		{ TEXT("CTRL_L_mouth_funnelD.ty"),          TEXT("mouthFunnel"),            0.35f },
 
 		// pucker
 		{ TEXT("CTRL_L_mouth_purseU.ty"),           TEXT("mouthPucker"),            0.50f },
@@ -379,6 +385,21 @@ void USevenLipSyncComponent::StartAudio(const TArray<float>& Samples)
 		return;
 	}
 
+	// Every pass through this function is a playback start (first play and each
+	// loop), so the body animation is restarted here: audio and pose then always
+	// begin on the same frame instead of drifting apart over loops.
+	if (bRestartAnimationOnPlayback && BodyAnimation && TargetMesh)
+	{
+		TargetMesh->PlayAnimation(BodyAnimation, false);
+		if (BodyAnimationRate > 0.0f && !FMath::IsNearlyEqual(BodyAnimationRate, 1.0f))
+		{
+			TargetMesh->SetPlayRate(BodyAnimationRate);
+		}
+
+		UE_LOG(LogTemp, Log, TEXT("SevenLipSync: body animation restarted '%s' (rate %.2f)"),
+			*BodyAnimation->GetName(), BodyAnimationRate);
+	}
+
 	if (!AudioComponent)
 	{
 		AudioComponent = NewObject<UAudioComponent>(this);
@@ -569,17 +590,35 @@ void USevenLipSyncComponent::UpdateMorphTargets(float DeltaTime)
 	}
 
 	// Accumulate every mapping into a target value per morph target.
+	const FName JawOpenMorph(TEXT("jawOpen"));
+	const FName MouthFunnelMorph(TEXT("mouthFunnel"));
+	const FName MouthPuckerMorph(TEXT("mouthPucker"));
+
 	TMap<FName, float> Targets;
 	for (const SevenLipSyncPrivate::FMorphMapping& Mapping : SevenLipSyncPrivate::GMorphMappings)
 	{
-		const FString MorphName(Mapping.Morph);
-		if (bMouthOnly && !SevenLipSyncPrivate::IsMouthMorph(MorphName))
+		const FName MorphId(Mapping.Morph);
+		if (bMouthOnly && !SevenLipSyncPrivate::IsMouthMorph(MorphId.ToString()))
 		{
 			continue;
 		}
 
-		const float Value = SevenLipSyncPrivate::ReadControl(Controls, Mapping.Control) * Mapping.Scale * Gain;
-		float& Accumulated = Targets.FindOrAdd(FName(*MorphName));
+		float Scale = Mapping.Scale;
+		if (const float* MorphOverride = MorphScaleOverrides.Find(MorphId))
+		{
+			Scale *= FMath::Max(0.0f, *MorphOverride);
+		}
+		if (MorphId == JawOpenMorph)
+		{
+			Scale *= FMath::Max(0.0f, JawOpenScale);
+		}
+		else if (MorphId == MouthFunnelMorph || MorphId == MouthPuckerMorph)
+		{
+			Scale *= FMath::Max(0.0f, RoundingScale);
+		}
+
+		const float Value = SevenLipSyncPrivate::ReadControl(Controls, Mapping.Control) * Scale * Gain;
+		float& Accumulated = Targets.FindOrAdd(MorphId);
 		Accumulated += Value;
 	}
 
@@ -588,6 +627,76 @@ void USevenLipSyncComponent::UpdateMorphTargets(float DeltaTime)
 	if (!bPlaying)
 	{
 		Targets.Reset();
+	}
+
+	// Jaw shaping, in this order:
+	//   1. ceiling - the model hands out up to 0.75 on a loud vowel, and the
+	//      clamp to 1.0 below would happily let that through;
+	//   2. deadzone - while somebody talks the model keeps the jaw around
+	//      0.07-0.12 and never quite returns to zero, which is what makes the
+	//      mouth look permanently ajar. Everything under the floor is closed,
+	//      and the remaining range is stretched back over 0..1.
+	if (float* JawValue = Targets.Find(JawOpenMorph))
+	{
+		*JawValue = FMath::Min(*JawValue, FMath::Clamp(JawOpenMax, 0.0f, 1.0f));
+
+		const float Floor = FMath::Clamp(JawOpenFloor, 0.0f, 0.85f);
+		if (Floor > KINDA_SMALL_NUMBER)
+		{
+			*JawValue = FMath::Max(0.0f, (*JawValue - Floor) / (1.0f - Floor));
+		}
+	}
+
+	// The jaw alone does not shut this mouth: the model keeps 0.1-0.35 on
+	// mouthFunnel / mouthLowerDown / mouthPucker nearly all the time, and any of
+	// those alone holds a visible hole in the lips. So the "open" lip shapes ride
+	// on the jaw: fully back once the jaw is ~0.12 open, gone when it is shut.
+	//
+	// The corner deformers get the same treatment, just softer: with the lips
+	// sealed, a non-zero mouthStretch / mouthDimple / mouthSmile still drags the
+	// corner sideways and folds the lip surface - that is the pinch you see at
+	// the corner. Damped to 30% while the jaw is shut, back to full once it opens.
+	if (LipFollowJaw > 0.0f)
+	{
+		constexpr float LipFollowJawRange = 0.12f;
+		constexpr float CornerFloor = 0.30f;
+
+		const float JawNow = Targets.FindRef(JawOpenMorph);
+		const float OpenDrive = FMath::Clamp(JawNow / LipFollowJawRange, 0.0f, 1.0f);
+		const float Follow = FMath::Clamp(LipFollowJaw, 0.0f, 1.0f);
+		const float LipFactor = FMath::Lerp(1.0f, OpenDrive, Follow);
+		const float CornerFactor = FMath::Lerp(1.0f, FMath::Lerp(CornerFloor, 1.0f, OpenDrive), Follow);
+
+		if (LipFactor < 0.999f)
+		{
+			const FName LowerDownLeft(TEXT("mouthLowerDownLeft"));
+			const FName LowerDownRight(TEXT("mouthLowerDownRight"));
+			for (const FName& LipMorph : { MouthFunnelMorph, MouthPuckerMorph, LowerDownLeft, LowerDownRight })
+			{
+				if (float* LipValue = Targets.Find(LipMorph))
+				{
+					*LipValue *= LipFactor;
+				}
+			}
+		}
+
+		if (CornerFactor < 0.999f)
+		{
+			const FName CornerMorphs[] =
+			{
+				FName(TEXT("mouthSmileLeft")),   FName(TEXT("mouthSmileRight")),
+				FName(TEXT("mouthStretchLeft")), FName(TEXT("mouthStretchRight")),
+				FName(TEXT("mouthDimpleLeft")),  FName(TEXT("mouthDimpleRight")),
+				FName(TEXT("mouthFrownLeft")),   FName(TEXT("mouthFrownRight")),
+			};
+			for (const FName& CornerMorph : CornerMorphs)
+			{
+				if (float* CornerValue = Targets.Find(CornerMorph))
+				{
+					*CornerValue *= CornerFactor;
+				}
+			}
+		}
 	}
 
 	// Silence gate. The model happily invents mouth shapes for silence, breath and
@@ -623,11 +732,15 @@ void USevenLipSyncComponent::UpdateMorphTargets(float DeltaTime)
 		Pair.Value = FMath::Clamp(Pair.Value, 0.0f, 1.0f) * SmoothedGate;
 	}
 
-	// Interpolate towards the target and write the morph target.
+	// Interpolate towards the target and write the morph target. Closing is
+	// deliberately quicker than opening: the mouth has to shut between syllables,
+	// otherwise neighbouring words smear together into one long "aaaah".
 	for (const TPair<FName, float>& Pair : Targets)
 	{
 		float& Current = MorphValues.FindOrAdd(Pair.Key);
-		Current = FMath::FInterpTo(Current, Pair.Value, DeltaTime, FMath::Max(1.0f, SmoothingSpeed));
+		const bool bFalling = Pair.Value < Current;
+		const float Speed = bFalling ? CloseSpeed : OpenSpeed;
+		Current = FMath::FInterpTo(Current, Pair.Value, DeltaTime, FMath::Max(1.0f, Speed));
 		TargetMesh->SetMorphTarget(Pair.Key, Current);
 	}
 
@@ -638,7 +751,7 @@ void USevenLipSyncComponent::UpdateMorphTargets(float DeltaTime)
 		{
 			continue;
 		}
-		It.Value() = FMath::FInterpTo(It.Value(), 0.0f, DeltaTime, FMath::Max(1.0f, SmoothingSpeed));
+		It.Value() = FMath::FInterpTo(It.Value(), 0.0f, DeltaTime, FMath::Max(1.0f, CloseSpeed));
 		TargetMesh->SetMorphTarget(It.Key(), It.Value());
 		if (It.Value() < KINDA_SMALL_NUMBER)
 		{
@@ -649,17 +762,22 @@ void USevenLipSyncComponent::UpdateMorphTargets(float DeltaTime)
 	if (bLogValues)
 	{
 		DebugLogTimer += DeltaTime;
-		if (DebugLogTimer >= 0.5f)
+		if (DebugLogTimer >= FMath::Max(0.01f, LogInterval))
 		{
 			DebugLogTimer = 0.0f;
 			const bool bAudioPlaying = AudioComponent && AudioComponent->IsPlaying();
 			const int32 AvailableBytesNow = ProceduralWave ? ProceduralWave->GetAvailableAudioByteCount() : -1;
-			UE_LOG(LogTemp, Log, TEXT("SevenLipSync: jawOpen=%.3f funnel=%.3f pucker=%.3f smileL=%.3f lowerDownL=%.3f | audio=%s availKB=%d played=%.2fs cursor=%.2fs gate=%.2f"),
+			UE_LOG(LogTemp, Log, TEXT("SevenLipSync: jawOpen=%.3f funnel=%.3f pucker=%.3f smileL=%.3f lowerDownL=%.3f close=%.3f pressL=%.3f stretchL=%.3f dimpleL=%.3f rawJaw=%.3f | audio=%s availKB=%d played=%.2fs cursor=%.2fs gate=%.2f"),
 				MorphValues.FindRef(FName(TEXT("jawOpen"))),
 				MorphValues.FindRef(FName(TEXT("mouthFunnel"))),
 				MorphValues.FindRef(FName(TEXT("mouthPucker"))),
 				MorphValues.FindRef(FName(TEXT("mouthSmileLeft"))),
 				MorphValues.FindRef(FName(TEXT("mouthLowerDownLeft"))),
+				MorphValues.FindRef(FName(TEXT("mouthClose"))),
+				MorphValues.FindRef(FName(TEXT("mouthPressLeft"))),
+				MorphValues.FindRef(FName(TEXT("mouthStretchLeft"))),
+				MorphValues.FindRef(FName(TEXT("mouthDimpleLeft"))),
+				SevenLipSyncPrivate::ReadControl(Controls, TEXT("CTRL_C_jaw.ty")),
 				bAudioPlaying ? TEXT("on") : TEXT("off"),
 				AvailableBytesNow / 1024,
 				DebugPlayedSeconds,

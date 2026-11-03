@@ -5,7 +5,7 @@ No CVar bypass here: this is exactly what the editor will do for the user.
 import unreal
 import os
 
-ROOT = "/Game/SevGame"
+ROOT = os.environ.get("RESAVE_ROOT", "/Game/SevGame")
 
 content = unreal.Paths.convert_relative_path_to_full(unreal.Paths.project_content_dir())
 root_dir = os.path.join(content, ROOT[len("/Game/"):].replace("/", os.sep))

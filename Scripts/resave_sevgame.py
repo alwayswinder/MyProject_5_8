@@ -15,7 +15,10 @@ Run with:
 import unreal
 import os
 
-ROOT = "/Game/SevGame"
+# Default root; override with the RESAVE_ROOT env var before launching, e.g.
+#   $env:RESAVE_ROOT="/Game/Developers/fulinhou/Skele"
+ROOT = os.environ.get("RESAVE_ROOT", "/Game/SevGame")
+unreal.log("SEVGAME: ROOT=%s" % ROOT)
 
 # Bypass the package/engine version compatibility gate so the 5.8.4-branch
 # packages can be read at all.  Only needed for this one-off resave.

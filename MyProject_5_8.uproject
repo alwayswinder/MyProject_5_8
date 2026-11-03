@@ -162,6 +162,10 @@
 		{
 			"Name": "RuntimeMetaHumanLipSync",
 			"Enabled": true
+		},
+		{
+			"Name": "SpecialAgent",
+			"Enabled": true
 		}
 	]
 }
