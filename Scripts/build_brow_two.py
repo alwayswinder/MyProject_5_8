@@ -15,7 +15,7 @@ MESH = '/Game/_MyTest/Mouth/Mesh/Seven'
 PREFIX = 'BROW_'
 LIMIT = 10.0
 COEF = 0.5
-SHAPE = 'Box_1mm'
+SHAPE = 'Box_Thick'
 CTRL_SHAPE_SCALE = (0.42, 0.22, 0.05)
 CTRL_YAW_DEG = 0.0
 
@@ -230,3 +230,4 @@ if __name__ == '__main__':
     except Exception:
         unreal.log_error('[BrowTwo] FAILED\n' + traceback.format_exc())
         raise
+

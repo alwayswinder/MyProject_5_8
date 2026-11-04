@@ -21,7 +21,7 @@ MESH = '/Game/_MyTest/Mouth/Mesh/Seven'
 PREFIX = 'BPT_'
 LIMIT = 10.0
 COEF = 1.0
-SHAPE = 'Box_1mm'
+SHAPE = 'Box_Thick'
 SHAPE_SCALE = (0.12, 0.10, 0.05)
 
 # (control, display, bone, world pos (UE), max zCircle)
@@ -204,3 +204,4 @@ if __name__ == '__main__':
     except Exception:
         unreal.log_error('[BrowPoints] FAILED\n' + traceback.format_exc())
         raise
+

@@ -4,6 +4,10 @@
 
 本文按 `CR_Seven_MorphSliders` 眉毛控制的三次重做整理，所有数值都是实测，不是推算。**先读第 5 节的踩坑表，能省掉大半返工。** 时间紧就直接照第 8 节 SOP 和第 9 节模板抄。
 
+> 已经迁完、验证通过的部位（眉毛 10 个控制）整理在
+> [SevenFaceControllerRecipes.md](SevenFaceControllerRecipes.md)——那份文档不需要 Max 文件，
+> 照表就能从零搭建。本文只负责「新部位怎么查 Max、怎么迁、怎么验证」。
+
 ---
 
 ## 0. 总览
@@ -174,11 +178,23 @@ Copy-Item Content\_MyTest\Mouth\Rig\CR_Seven_MorphSliders.uasset Saved\Codex\Bac
 | 目标 | 做法 |
 |---|---|
 | 手柄贴在目标部位 | `pos` 用**该部位骨骼的世界坐标**，不要凭感觉放 |
-| 形状像一枚扁平条 | `Box_1mm`（线框盒），`shape_name='Box_1mm'` |
+| 形状像一枚扁平条 | `Box_Thick`（粗线框盒），`shape_name='Box_Thick'` |
 | 尺寸 | 见下方「手柄大小只能走 shape transform」 |
 | 颜色 | `settings.shape_color = LinearColor(1.0, 0.42, 0.04, 1.0)`（橙） |
 
-内置形状清单在 `Engine\Plugins\Animation\ControlRig\Content\Controls\`，名字去掉 `ControlRig_` 前缀就是 `shape_name`：`Box`、`Box_1mm`、`Box_3mm`、`Box_solid`、`Arrow`、`Arrow4`、`Circle`、`Diamond`、`Hexagon`、`Octagon`、`Pyramid`、`RoundedSquare`、`Sphere`、`Square`、`Star4`、`Triangle`、`Wedge`、`Line`……
+**5.8 的形状名有两套，别混：**
+
+- 形状资产：`Engine\Plugins\Animation\ControlRig\Content\Controls\ControlRig_*.uasset`，例如 `Box_1mm` / `Box_3mm` / `Box_solid`。
+- 默认形状库（实际生效的这套）：`/ControlRig/Controls/DefaultGizmoLibraryNormalized`，名字是 `Box_Thin` / `Box_Thick` / `Box_Solid`。
+  `Box_Thick` 的 proxy 就是 `ControlRig_Box_3mm`（粗线框），`Box_Thin` 是 `ControlRig_Box_1mm`。
+- 本项目所有眉毛控制统一用 **`Box_Thick`**。名字大小写必须与库里一致（写 `Box_thick` 不报错，但显示会回退）。
+
+确认 shape_name 是否存在：
+
+```python
+lib = unreal.load_asset('/ControlRig/Controls/DefaultGizmoLibraryNormalized')
+[s.get_editor_property('shape_name') for s in lib.get_editor_property('shapes')]
+```
 
 **手柄大小只能走 shape transform，绝不能改控制本身的缩放。**
 
@@ -207,9 +223,9 @@ h.set_control_shape_transform(k, shape_tf, False)  # current
 - `RigControlSettings.shape_transform` 是**只读**属性，直接赋值会报 `read-only and cannot be set`，只能用 `set_control_shape_transform`。
 - `initial` 和 `current` **都要设**。只设 current 时，编辑器里显示的仍是初始值（默认 1,1,1），看上去手柄依旧是巨大的一块。
 
-**尺寸坑**：`Box`（无后缀）默认是 1 米级的盒子，`scale 1.9` 会直接糊满半个屏幕；`Box_1mm` 才是 10 cm 级。摆之前先想清楚基准尺寸。
+**尺寸坑**：`Box`（无后缀）默认是 1 米级的盒子，`scale 1.9` 会直接糊满半个屏幕；`Box_Thin` / `Box_Thick` 才是 10 cm 级，且两者基准尺寸相同（Thick 只是线更粗，约 3 mm），所以从 `Box_1mm` 换 `Box_Thick` 时 **shape scale 不用改**。摆之前先想清楚基准尺寸。
 
-**先量 Max 原手柄**：`numKnots` + `getKnotPoint` 算包围盒，本次六个 zCircle 直径约 0.8 cm；UE 里 `Box_1mm` 的 shape scale 按「目标直径 ÷ 10」估（0.12 ≈ 1.2 cm），再截图微调。点与点间距不足 3 cm 时，手柄别超过 1.5 cm，否则会互相压住。
+**先量 Max 原手柄**：`numKnots` + `getKnotPoint` 算包围盒，本次六个 zCircle 直径约 0.8 cm；UE 里 `Box_Thick` 的 shape scale 按「目标直径 ÷ 10」估（0.12 ≈ 1.2 cm），再截图微调。点与点间距不足 3 cm 时，手柄别超过 1.5 cm，否则会互相压住。
 
 **位置坑**：不要假设「Y 就是左右」。这具骨架 `meibu_L` 在 `(4.46, 7.49, 161.39)`、`meibu_R` 在 `(-4.46, 7.49, 161.39)` —— **X 才是左右，Y 是前后，Z 是上下**。按坐标轴直觉放会把两个手柄都甩到脑后。
 
@@ -318,6 +334,18 @@ ctrl.add_link(add2 + '.Result', 'BROW_MAKE_%s.Translation' % bone, False)
 - 多条链共用 `bInitial=True` 的 GetTransform 是安全的，只要都读同一个初始值再相加。
 - 幂等脚本要用**独立前缀**（本次用 `BPT_`），不要复用会被其它脚本整体清掉的 `BROW_`。
 
+带旋转的叠加（新控制还影响骨骼朝向时）：
+
+```
+BT_Get(bone, Global, bInitial=True).Transform.Rotation
+  → QuatMul(A=初始, B=Delta)   -- 世界 X 轴增量
+  → MAKE.Rotation
+Delta = QuatFromAxisAndAngle(Axis=(1,0,0), Angle=-dEuler * deg2rad)
+```
+
+- 用 `break_link('BROW_MAKE_<骨>.Rotation')` 断开原连接；
+- `A/B` 顺序与角度符号见 4.6——这两处错了会出现「角度对、方向乱」。
+
 ---
 
 ## 4. 实战：眉毛控制（整体 + 六个点控）
@@ -335,7 +363,7 @@ ctrl.add_link(add2 + '.Result', 'BROW_MAKE_%s.Translation' % bone, False)
 | Rig | `/Game/_MyTest/Mouth/Rig/CR_Seven_MorphSliders` |
 | 控制 | `CTRL_BROW_L` / `CTRL_BROW_R`，`POSITION`，±10 |
 | 显示名 | 左眉整体 / 右眉整体 |
-| 形状 | `Box_1mm`，橙色；尺寸走 shape transform `(0.42, 0.22, 0.05)`，控制自身缩放 `(1,1,1)` |
+| 形状 | `Box_Thick`，橙色；尺寸走 shape transform `(0.42, 0.22, 0.05)`，控制自身缩放 `(1,1,1)` |
 | 位置 | `(4.0, 11.2, 161.2)` / `(-4.0, 11.2, 161.2)`，父 `Root` |
 | 骨骼 | L：`meibu_L` + `Bone007/008/009`；R：`meibu_R` + `Bone010/011/012` |
 | 系数 | `0.5` |
@@ -372,7 +400,7 @@ Max 侧：每侧眉毛三个可拾取样条点（`SplineShape`），拖动时**�
 | `zCircle053` | `CTRL_BROW_R_OUT` | 右眉外点 | `Bone012` | `(-6.748, 7.371, 162.146)` |
 
 - 类型 `POSITION`，限值 ±10，**系数 1.0**（不是整体眉的 0.5）
-- 形状 `Box_1mm`，shape transform `(0.12, 0.10, 0.05)`（Max 侧样条直径约 0.8 cm）
+- 形状 `Box_Thick`，shape transform `(0.12, 0.10, 0.05)`（Max 侧样条直径约 0.8 cm）
 - 父级 `Root`；控制位置 = 对应骨骼的静止世界坐标（Max zCircle 与骨骼重合）
 - 坐标换算实测为 **`UE = (Max.x, −Max.y, Max.z)`**（本骨架不使用 `(−y, −x, z)`）
 - 图上与整体控制相加：`BROW_VADD_<骨>` → `BPT_ADD_<骨>` → `BROW_MAKE_<骨>` → `SET_<骨>`
@@ -390,6 +418,91 @@ Max 侧：每侧眉毛三个可拾取样条点（`SplineShape`），拖动时**�
 > 点控依赖 `BROW_VADD_*` / `BROW_MAKE_*` 节点。若重跑 `clear_rig.py` 或 `build_brow_two.py`
 > 把整体眉图重建了，需要再跑一次 `build_brow_points.py` 把相加节点接回去。
 
+### 4.6 右眉弯曲（Animcraft_Right_Brow_Ctrl）
+
+**这个不是单骨骼控制。** `Animcraft_Right_Brow_Ctrl`（NURBSCurveShape，父级 `Animcraft_Right_Brow_Z_Ctrl`）
+的 `position_list[2]` 是逐轴 `float_limit`：x 锁在 0、y ∈ [-2,2]、拖动时 z 被夹到 -1。
+位置值 → `KPoint051/052/053` 的 `Position_Expression`（变量 `MeiMao_SX`）→ 三根眉骨
+`Bone010/011/012` 的位置 + 绕世界 X 的旋转；`meibu_R` 不动。
+
+所以拖动是**分段线性**，不是单一系数：
+- y>0 与 y<0 两条斜率不同（K 点里的 `if` 分支）；
+- limiter 夹住后，拖 10 和拖 20 结果相同（拖不出更多）；
+- 拖动后 `p2` 的 z 分量虽然显示 `-1`，但它**不进入骨骼驱动**——实际位移与 `z=0` 完全相同。
+  别把"z=-1 的外移"写进图里（早期版本加过，表现就是弯曲时眉毛边缘外飘）。
+
+实测基准（`position=(0,0,0)`）：Bone010 `(-1.17773,-9.76263,161.442)`、
+Bone011 `(-4.07024,-9.00898,161.795)`、Bone012 `(-6.74794,-7.37118,162.146)`，欧拉 X 都是 90°。
+
+| 相对基准 | Bone010 | Bone011 | Bone012 |
+|---|---|---|---|
+| `y=+2, z=0` dP | `(-0.01744,-0.19924,0.3)` | `(-0.18126,0.08452,0.8)` | `(0,0,0.1)` |
+| `y=-2, z=0` dP | `(0.08218,-0.20796,-0.5)` | `(0.29491,-0.31406,-0.62)` | `(0,0,-0.1)` |
+| 旋转 `y=+2`（度） | `-9.1674` | `0` | `+10.313` |
+| 旋转 `y=-2`（度） | `+11.4589` | `-3.4377` | `-4.5837` |
+
+UE 实现：
+
+| 项 | 值 |
+|---|---|
+| 控制 | `CTRL_BROW_R_BEND`，`POSITION`，±2，取控制值 **Z 分量** `c` |
+| 位置 | `(-2.2336, 11.5447, 162.256)`，父 `Root` |
+| 形状 | `Box_Thick`，青色 `(0.15, 0.85, 1.0)`，shape scale `(0.15, 0.10, 0.05)` |
+| 位置映射 | `c>0`: `(c/2)*D_pos`；`c<0`: `(-c/2)*D_neg` |
+| 旋转 | 绕世界 X 轴；`NewRot = Initial * Delta`，角度 = `-(dEuler)` |
+| 图 | `BPT_ADD_<骨>` → `ADD1(+分支偏移)` → `MAKE.Translation`；`MAKE.Rotation` 改接 `QROT` |
+| 分支节点 | `MathFloatGreater` + `MathVectorSelectBool` / `MathFloatSelectBool` |
+
+自检（实例化后骨骼世界位移 / 绕 X 旋转，cm / 度）：
+
+| 输入 | Bone010 | Bone011 | Bone012 |
+|---|---|---|---|
+| `BEND=(0,0,2)` | `dP=(-0.0174,-0.1992,0.3)` / `-9.167°` | `(-0.1812,0.0845,0.8)` / `0` | `(0,0,0.1)` / `+10.313°` |
+| `BEND=(0,0,-2)` | `(0.0822,-0.2079,-0.5)` / `+11.459°` | `(0.2949,-0.3141,-0.62)` / `-3.438°` | `(0,0,-0.1)` / `-4.584°` |
+| `CTRL_BROW_R=(10,0,0)` + `BEND=(0,0,2)` | `(4.9826,-0.1992,0.3)` | `(4.8188,0.0845,0.8)` | `(5,0,0.1)` |
+
+三个关键坑：
+
+- **实际拖动值才是准的**：手动 `controller[2].value = [0,2,-1]` 与拖动后读到的 `(0,2,-1)` 结果不同
+  （limiter 的 z 不参与驱动）。一律以 `move` 后的骨骼世界位移为准。
+- **四元数合成顺序**：`MathQuaternionMul` 要 `A=初始旋转, B=增量`（`Initial * Delta`），
+  并且增量角度取 `-dEuler`——UE 的 Rotator.Roll 与 Max 欧拉 X 方向相反。
+  用 `Delta * Initial` 会变成绕骨骼局部轴，结果 pitch/yaw/roll 全部串味。
+- **SelectBool 引脚**名是 `Condition` / `IfTrue` / `IfFalse`，不是 `bPickTrue` / `A` / `B`（写错直接 `Cannot find pin`）。
+
+复现：`python Scripts\ue_run.py Scripts\build_brow_bend.py`（幂等）
+
+### 4.7 左眉弯曲（Animcraft_Left_Brow_Ctrl）
+
+与 4.6 镜像：`Animcraft_Left_Brow_Ctrl`（NURBSCurveShape，父级 `Animcraft_Left_Brow_Z_Ctrl`，
+世界位置 `(3.17631,-11.5447,162.256)`，scale `+0.9426`），同样是 float_limit + K 点表达式，
+驱动 `Bone008/009/007`（内/中/外）的位置 + 绕世界 X 旋转，`meibu_L` 不动。
+
+> 左眉实际拖动时 `p2=(0,±2,0)`，z 保持 0（父级正缩放），所以**没有右眉那种 z=-1 的干扰**。
+> 弯曲时眉毛外缘不会外飘——7.1 版本的图里误加过 zoff，表现就是外缘偏移。
+
+基准（`position=(0,0,0)`）：Bone007 `(6.74793,-7.37117,162.146)`、
+Bone008 `(1.17773,-9.76263,161.442)`、Bone009 `(4.07027,-9.00897,161.795)`，欧拉 X 都是 90°。
+
+| 相对基准 | Bone007 | Bone008 | Bone009 |
+|---|---|---|---|
+| `y=+2, z=0` dP | `(0,0,0.1)` | `(0.01744,-0.19924,0.3)` | `(0.18126,0.08452,0.8)` |
+| `y=-2, z=0` dP | `(0,0,-0.1)` | `(-0.08219,-0.20795,-0.5)` | `(-0.2949,-0.31406,-0.62)` |
+| 旋转 `y=+2`（度） | `-10.3132` | `+9.1673` | `0` |
+| 旋转 `y=-2`（度） | `+4.5837` | `-11.4591` | `+3.4378` |
+
+UE：`CTRL_BROW_L_BEND`，`POSITION`，±2，位置 `(3.17631, 11.5447, 162.256)`，
+`Box_Thick` 青色，形状与逻辑和 4.6 完全一致（正负分支 + `Initial * Delta`，无 zoff）。
+
+自检（与 Max 对照一致）：
+
+| 输入 | Bone007 | Bone008 | Bone009 |
+|---|---|---|---|
+| `BEND=(0,0,2)` | `dP=(0,0,0.1)` / `-10.313°` | `(0.0174,-0.1992,0.3)` / `+9.167°` | `(0.1813,0.0845,0.8)` / `0` |
+| `BEND=(0,0,-2)` | `(0,0,-0.1)` / `+4.584°` | `(-0.0822,-0.2079,-0.5)` / `-11.459°` | `(-0.2949,-0.3141,-0.62)` / `+3.438°` |
+
+复现：`python Scripts\ue_run.py Scripts\build_brow_bend_left.py`（幂等）
+
 ---
 
 ## 5. 踩坑速查表
@@ -402,7 +515,7 @@ Max 侧：每侧眉毛三个可拾取样条点（`SplineShape`），拖动时**�
 | 视口显示 `Previewing Reference Pose` | 拖控制完全没反应 | 这是编辑器状态，不是资产问题，切到 `Previewing Rig` |
 | 用 `LocalSpace` + 局部 Y | 左眉一上、右眉一下 | 这套骨架改用 `GlobalSpace` |
 | 按「Y = 左右」摆控制 | 手柄跑到脑后 / 头上 | 先读骨骼世界坐标，X 才是左右 |
-| `Box` 直接摆 | 手柄变成糊满屏幕的巨大盒子 | 用 `Box_1mm`，或把 shape scale 缩到 0.1 量级 |
+| `Box` 直接摆 | 手柄变成糊满屏幕的巨大盒子 | 用 `Box_Thick`，或把 shape scale 缩到 0.1 量级 |
 | `GetTransform.Transform.Scale` | 报 `Cannot find pin` | 写 `Scale3D` |
 | `SetTransform` 连“Transform” | 找不到引脚 | 输入引脚叫 `Value` |
 | `RigHierarchy.set_translation` | `AttributeError` | 用 `set_global_transform` / `set_local_transform` |
@@ -415,9 +528,17 @@ Max 侧：每侧眉毛三个可拾取样条点（`SplineShape`），拖动时**�
 | 脚本里拼 `getSourceFileName()` | `Unable to convert: undefined to type: String` | 该 API 在 MCP 环境不可用，删掉或 `try` 包住 |
 | 移动后只恢复 `pos` | 父级带旋转/缩放时会偏 | 保存/恢复整个 `n.transform` |
 | 系数照抄上一个控制器 | 点控写 0.5，拖 10 只动 5 | 每个控制器实测（3.4） |
+| 手动设 `controller[2].value` 当作拖动 | 端点对、边缘偏移 | 一律以 `move` 后的骨骼位移为准（4.6） |
+| 左右直接复用同侧 zoff 数据 | 左眉弯曲时外缘外飘 | 左右分别实测；左眉实际拖动 z 不参与（4.7） |
 | 两条 SetTransform 串行做叠加 | 后一条覆盖前一条，或都读 bInitial 互相打架 | MAKE 前插 VectorAdd（3.5） |
 | 幂等脚本复用公共前缀 | 重跑整体脚本后点控节点悬空或消失 | 独立前缀 + 在文档写清重跑顺序 |
 | 截图时没选中控制 | 手柄与骨骼线混在一起，看不清位置 | 先 `hc.set_selection([...])` 再 `CaptureEditorImage` |
+| Max 里拖 5/10/20 结果完全一样 | 以为数据测错 | 是 `float_limit`/约束 clamp，拖不出更多；改用 `controller[2].value` 扫值 |
+| 只恢复 `n.transform` 就以为复原了 | 复合控制器的值仍停在极限，后续基准全错 | 显式把 `controller[i].value` 设回原值 |
+| 旋转叠加后 pitch/yaw/roll 串味 | 四元数顺序或符号错 | `MathQuaternionMul` 用 `A=初始, B=增量`；角度取 `-dEuler`（4.6） |
+| `MathVectorSelectBool` 引脚写 `bPickTrue` | `Cannot find pin` | 引脚是 `Condition` / `IfTrue` / `IfFalse` |
+| shape_name 写成 `Box_thick` | 不报错，但显示回退成默认形状 | 用库里的准确大小写 `Box_Thick`（2.3） |
+| `CaptureEditorImage` 报 `Failed to capture any editor windows` | 编辑器不在前台/不在 rig 编辑器页 | 先 `OpenEditorForAsset` 打开 rig，再 `AppActivate` 编辑器进程后截图 |
 
 ---
 
@@ -442,6 +563,14 @@ Max 侧：每侧眉毛三个可拾取样条点（`SplineShape`），拖动时**�
 | `Scripts/build_brow_two.py` | 建左右眉整体控制 + 图 + 自检（幂等） |
 | `Scripts/probe_template_a.ms` | 模板 A 的可运行版（枚举 + 结构 + 移动矩阵） |
 | `Scripts/build_brow_points.py` | 建左右眉各三个点控 + 图 + 自检（幂等） |
+| `Scripts/build_brow_bend.py` | 建右眉弯曲控制（多骨骼 + 旋转 + 分支）+ 自检（幂等） |
+| `Scripts/build_brow_bend_left.py` | 建左眉弯曲控制（右侧镜像）+ 自检（幂等） |
+| `Scripts/build_eye_points.py` | 建左右眼周 16 个点控 + 自检（幂等） |
+| `Scripts/probe_eye_r.ms` / `probe_eye_l.ms` | Max 侧眼周 zCircle 结构与驱动响应 |
+| `Scripts/probe_animcraft_rb*.ms` | Max 侧 Animcraft_Right_Brow_Ctrl 结构 / 值扫描 |
+| `Scripts/probe_animcraft_lb.ms` | Max 侧 Animcraft_Left_Brow_Ctrl 镜像数据 |
+| `Scripts/probe_quat_order.py` | 验证 UE 四元数合成顺序与轴（旋转类控制必查） |
+| `Scripts/probe_all_shapelibs.py` | 枚举所有 shape library 与 shape_name（查 Box_Thick 这类名字） |
 | `Scripts/probe_zcircle*.ms` | Max 侧 zCircle 结构 / 拖动响应探测 |
 | `Scripts/probe_ue_brow_bones.py` | 打印 UE 眉毛骨骼世界坐标 / 父级（定控制位置用） |
 | `Scripts/set_brow_points_preview.py` | 给 debugged rig 喂值，配合截图看画面 |
@@ -599,6 +728,11 @@ Max 侧：每侧眉毛三个可拾取样条点（`SplineShape`），拖动时**�
 
 新增一批控制后，记得同步更新第 7 节索引和对应映射表。
 
+> 如果目标控制器驱动多根骨骼、带旋转或分段（如 4.6 / 4.7 的眉毛弯曲），模板以
+> `Scripts/build_brow_bend.py`（右）和 `build_brow_bend_left.py`（左，镜像数据）为准：
+> 它们演示了 `float_limit` 值扫描、正负分支、`MathVectorSelectBool` / `MathFloatSelectBool`
+> 和 `QuatMul` 旋转叠加。
+
 ### 9.3 反模式（这些都会导致返工）
 
 | 反模式 | 后果 | 正确做法 |
@@ -612,6 +746,8 @@ Max 侧：每侧眉毛三个可拾取样条点（`SplineShape`），拖动时**�
 | 串行 SetTransform 做叠加 | 覆盖或双倍 | MAKE 前插 VectorAdd（3.5） |
 | 在 `Previewing Reference Pose` 下判断「拖不动」 | 误判资产有问题 | 切 `Previewing Rig` 再试 |
 | 只跑数值不做截图 | 位置/朝向错了才发现 | 第 6 节「画面」确认 |
+| 多骨骼控制只按单骨骼斜率做 | 端点对、中间全错 | 先扫值分清正/负分支与固定偏移（4.6） |
+| 旋转类控制不看四元数顺序 | pitch/yaw/roll 串味 | 用 `probe_quat_order.py` 先验证 `Initial*Delta` 与轴 |
 
 ---
 
