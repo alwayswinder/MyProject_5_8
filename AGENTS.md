@@ -2,6 +2,10 @@
 
 This file provides guidance to coding agents working in this repository.
 
+## Agent Conventions
+
+- **Reasoning language — Chinese required.** All internal reasoning, planning, and intermediate analysis must be written in Chinese (中文). This covers thinking before tool calls, plans, step-by-step derivations, and any scratch notes; it does not require translating source code, identifiers, logs, or quoted file content. Final user-facing replies follow the language the user writes in.
+
 ## Project Overview
 
 Unreal Engine **5.8.3** C++ project (`MyProject_5_8`, module of the same name). Content was wiped in commit `32a328e 清理` (2026-10-20), so this is currently a **code sandbox**, not a playable game — do not assume any template content (First Person, Third Person, dungeon pack, demo rooms) still exists.
