@@ -1,5 +1,8 @@
 # Seven 简易表情滑条
 
+> 本页记录 2026-11-03 创建与布局测试。2026-11-06 只读核对：资产仍为 7 控制、0 骨、29 节点，编译状态 BS_UP_TO_DATE；本次没有重跑全部功能测试。
+> 本资产不同于 28 个骨骼控制的 [CR_Seven_MorphSliders](SevenFaceControllerRecipes.md)。文档入口见 [README](README.md)。
+
 资产：`/Game/_MyTest/Mouth/Rig/CR_Seven_FaceMorphs`
 
 预览网格：`/Game/_MyTest/Mouth/Mesh/Seven`
@@ -43,5 +46,5 @@
 创建脚本：`Scripts/create_seven_face_rig.py`（拒绝覆盖同名资产）。
 已有资产可在编辑器的 Cmd 控制台执行
 `py "E:/Unreal/Projects/MyProject_5_8/Scripts/update_seven_face_layout.py"` 更新布局并保存。
-详细数值报告：`Saved/Codex/SevenFace/creation_report.json`、`reload.json`。
+以下历史报告保存在本机、被 Git 忽略的 Saved 目录，不能假定其他机器也有。详细数值报告：`Saved/Codex/SevenFace/creation_report.json`、`reload.json`。
 布局更新结果：`Saved/Codex/SevenFace/layout_report.json`。

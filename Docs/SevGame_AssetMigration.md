@@ -3,6 +3,10 @@
 2026-10-30。从 `D:\Work\SSMainline`（`Sev.uproject`）merge 过来的 `Content/SevGame`
 整批打不开，报「saved with a newer engine version」。本文件记录根因、修法和复用手法。
 
+> 状态：2026-10-30 / 11-02 的历史个案，2026-11-06 核对了脚本入口与使用边界，未重新执行资产重存。
+> 本流程仅适用于已确认可读、序列化兼容的这批 SevGame 资产。文件版本数字相同不能证明改版引擎数据完全兼容；关闭版本校验不是通用降级功能。
+> 当前面部测试网格为 `/Game/_MyTest/Mouth/Mesh/Seven`，与本文 `/Game/SevGame/.../Seven` 分开。总索引见 [README](README.md)。
+
 ## 现象
 
 Content Browser 里资产都在，双击报错；`Seven`、`Seven_Skeleton`、`Seven_PhysicsAsset`、
@@ -46,7 +50,7 @@ if (bLoaderNeedsEngineVersionChecks && IsEnforcePackageCompatibleVersionCheck() 
 和本机的 5.8.3 比 patch 号就挂了（`EngineVersion.cpp:123` 的 `IsCompatibleWith`）。
 注意报错里打的是源码里 `NSLOCTEXT` 的 `{3}`，实际值来自 `CompatibleWithEngineVersion`。
 
-**关键：二进制格式其实是一致的**，只是版本号标签不同。用 `Scripts/uasset_engver.py` 读表头：
+**本次排查先核对了包版本/CustomVersion，再在备份上实际加载、重存和校验。** 表头提供兼容性线索，但不单独证明所有二进制结构一致。`Scripts/uasset_engver.py` 的历史记录如下：
 
 | 字段 | 源资产 | 本机存的资产 |
 |---|---|---|
@@ -56,7 +60,7 @@ if (bLoaderNeedsEngineVersionChecks && IsEnforcePackageCompatibleVersionCheck() 
 | FileVersionLicenseeUE | 0 | 0 |
 | CustomVersions | 与 5.8.3 注册表逐条吻合（268/123/15/37/68/40…） | 同 |
 
-所以不需要改引擎、也不需要找 5.8.4 那份引擎，**在本机重存一遍**就能永久修好。
+这批资产在本机重存后通过加载检查，因此个案中不需要切换源引擎。该结果不能推广为所有 5.8.4/改版引擎资产都可直接重存；真正的格式或自定义序列化差异可能仍需源引擎导出或专门迁移。
 
 ## 修法（三步）
 
@@ -71,14 +75,14 @@ if (bLoaderNeedsEngineVersionChecks && IsEnforcePackageCompatibleVersionCheck() 
 2. 逐个 `load_asset` + `save_loaded_asset(..., only_if_is_dirty=False)`，表头被改写成
    `5.8.3-58210709+++UE5+Release-5.8` / `CompatibleWith = 5.8.0-55116800+++UE5+Release-5.8`。
 
-3. 关掉 bypass，再跑一次纯 load 校验，确认原厂校验能过。
+3. 结束这个专用重存进程，在全新进程中运行纯 load 校验，确认原厂检查能过。`resave_sevgame.py` 本身没有恢复 CVar；若在同一编辑器会话手动操作，必须恢复原 CVar 值，不能把仍处于 bypass 的加载当作验证。
 
 ## 可复用脚本
 
 | 脚本 | 作用 |
 |---|---|
 | `Scripts/uasset_engver.py` | 纯 Python 读 `.uasset`/`.umap` 表头：包版本、Licensee、CustomVersion、`SavedBy` / `CompatibleWith` 两个引擎版本串。批量跑：`python Scripts\uasset_engver.py "Content\SevGame\**\*.uasset"` |
-| `Scripts/resave_sevgame.py` | 在引擎里重存 `ROOT` 下的资产（默认 `/Game/SevGame`，改脚本顶部常量即可换目录） |
+| `Scripts/resave_sevgame.py` | 重存 ROOT（默认 `/Game/SevGame`，支持环境变量 `RESAVE_ROOT`；会关闭本进程版本检查） |
 | `Scripts/verify_sevgame.py` | 不开 bypass，纯校验 `ROOT` 下每个资产能否加载 |
 | `Scripts/inspect_seven.py` | 打印 `Seven` 的骨架/物理资产/morph/材质槽/后处理 AnimBP 引用，迁移后体检用 |
 
@@ -97,6 +101,8 @@ $proj = "E:\Unreal\Projects\MyProject_5_8\MyProject_5_8.uproject"
   -unattended -nosplash -nopause -abslog="E:\Unreal\Projects\MyProject_5_8\Saved\Logs\verify.log"
 ```
 
+60/60 是当时的数据量，后续以本次扫描数量为准。若覆盖了 `RESAVE_ROOT`，重存和校验都要使用同一个值，用完执行 `Remove-Item Env:RESAVE_ROOT -ErrorAction SilentlyContinue`，避免下一次处理到错误目录。
+
 日志里搜 `SEVGAME`（重存）和 `SEVCHECK`（校验）即可，脚本会打 `OK` / `FAIL` 逐条清单。
 
 ## 坑
@@ -106,8 +112,7 @@ $proj = "E:\Unreal\Projects\MyProject_5_8\MyProject_5_8.uproject"
   `save returned False`。原因就是当时 `MyProject_5_8` 的编辑器还开着、这 4 个包被它加载着。
   关掉编辑器重跑，60/60 通过。
 - 重存会重写 `Content/` 里的文件，动手前备份：`Saved/Backup/SevGame_before_resave_20261030.zip`。
-- 每次再从 `SSMainline` merge 新资产，都要重跑一遍 `resave_sevgame.py`。想彻底省事，就让对方
-  用原厂 5.8.3/5.8.4 存一份；或者约定「merge 完就跑这个脚本」。
+- merge 可能覆盖重存结果，先重新扫描版本与依赖；仅对确认属于同类兼容情况的资产执行本流程。若目标是原厂 5.8.3，应提供与目标版本兼容的资源，不能假定原厂 5.8.4 保存后自动兼容 5.8.3。
 
 ## KawaiiPhysics 插件
 
@@ -138,7 +143,7 @@ $proj = "E:\Unreal\Projects\MyProject_5_8\MyProject_5_8.uproject"
 遗留（迁移前就存在、与版本无关）：
 
 1. `Seven` 的 morph target 数量为 **0**（`inspect_seven.py` 报 `morph_count = 0`）。口型那套
-   52 个 ARKit morph 在 `/Game/_MyTest/Mouth/Seven` 那份资产上，不是这一份。要用 new mesh 做口型，
+   历史口型网格后来移到 `/Game/_MyTest/Mouth/Mesh/Seven`（当前 87 个 Morph Target），不是这一份。要用 SevGame mesh 做口型，
    得从 `D:\Download\Seven.fbx` 重新导入带 morph 的版本，或把 morph 合到这个 mesh 上。
 2. 材质槽 `Seven_Face_ncl_1` 和 `09_-_Default` 指向 `WorldGridMaterial`（源项目里就没挂 MI，
    `09 - Default` 是 3ds Max 的默认材质名），其余 11 个槽正常指向 `Seven_*_Inst`。
@@ -150,8 +155,7 @@ $proj = "E:\Unreal\Projects\MyProject_5_8\MyProject_5_8.uproject"
 用户在 `SSMainline` 里更新了内容后重新 merge 了一次，于是：
 
 1. 重存结果被覆盖。带上来的 55 个小资产又全部变回 `5.8.4-2147650534+++ScissorSeven+Game+Mainline`，
-   一条都加载不了。**这是预期行为：merge 会覆盖本地的重存结果，每次 merge 都要重跑
-   `resave_sevgame.py`。**
+   一条都加载不了。**merge 覆盖了本地重存结果；应重新核对版本和兼容性，再判断是否适用本流程。**
 2. merge 不完整，缺 5 个关键文件（`Animations/` 整个目录都没带过来）：
 
    | 缺的文件 | 源文件大小 | 源文件自己的版本标签 |
@@ -192,7 +196,7 @@ $proj = "E:\Unreal\Projects\MyProject_5_8\MyProject_5_8.uproject"
 
    修完 `Content` 全树 747 个包里「太新」的数量 = **0**。
 
-### 标准流程（每次 merge 后照抄）
+### 后续同类迁移的检查顺序
 
 ```powershell
 # 0. 关掉所有打开本项目的编辑器
@@ -200,8 +204,8 @@ $proj = "E:\Unreal\Projects\MyProject_5_8\MyProject_5_8.uproject"
 Get-ChildItem Content\SevGame -Recurse -File -Include *.uasset,*.umap | Where-Object IsReadOnly | ForEach-Object { $_.IsReadOnly = $false }
 # 2. 先看版本分布，确认哪些是新引擎存的
 python Scripts\audit_engver.py Content\SevGame
-# 3. 重存（日志找 SEVGAME: ===== SUMMARY ok=60 failed=0）
-# 4. 原厂校验（日志找 SEVCHECK: ===== ok=60 failed=0）
+# 3. 核对序列化、CustomVersion、插件及备份，确认适用后按上文专用进程重存
+# 4. 新进程原厂校验；成功数应与本次扫描数量一致，failed=0
 ```
 
 ### 范围提醒

@@ -1,7 +1,7 @@
 """CR_Seven_MorphSliders：左/右眉整体平移控制（对应 Max 的 Animcraft_*_Brow_Z_Ctrl）。
 
-Max 侧实测（世界空间）：拖 10 cm -> 本侧眉毛整体平移 5 cm，左眉右眉互不影响。
-UE 侧：两个 POSITION 控制，世界轴直接映射，系数 0.5。
+Max 侧实测（世界空间）：拖 10 cm -> 本侧眉毛整体平移 5 cm，左眉右眉互不影响；Y（前后）无效。
+UE 侧：两个 POSITION 控制，X/Z 各 ×0.5，Y 用逐分量乘 (0.5,0,0.5) 屏蔽。
 
 用法：python Scripts\\ue_run.py Scripts\\build_brow_two.py
 """
@@ -113,7 +113,12 @@ def build_side(ctrl, cfg, exec_prev, y0):
 
     scale = unit(ctrl, 'RigVMFunction_MathVectorScale', '%s_SCALE' % cfg['control'], (560, y))
     ctrl.add_link(get + '.Vector', scale + '.Value', False)
-    ctrl.set_pin_default_value(scale + '.Factor', '%f' % COEF, False, False)
+    ctrl.set_pin_default_value(scale + '.Factor', '1.000000', False, False)
+
+    # Max 侧 Y（前后）无效，只有 X/Z 各 0.5；用逐分量乘法把 Y 清零。
+    mask = unit(ctrl, 'RigVMFunction_MathVectorMul', '%s_MASK' % cfg['control'], (760, y))
+    ctrl.add_link(scale + '.Result', mask + '.A', False)
+    ctrl.set_pin_default_value(mask + '.B', '(X=%f,Y=0.000000,Z=%f)' % (COEF, COEF), False, False)
 
     prev = exec_prev
     for bone in cfg['bones']:
@@ -123,11 +128,11 @@ def build_side(ctrl, cfg, exec_prev, y0):
         ctrl.set_pin_default_value(bt + '.Space', 'GlobalSpace', False, False)
         ctrl.set_pin_default_value(bt + '.bInitial', 'True', False, False)
 
-        add = unit(ctrl, 'RigVMFunction_MathVectorAdd', 'VADD_%s' % bone, (800, y))
+        add = unit(ctrl, 'RigVMFunction_MathVectorAdd', 'VADD_%s' % bone, (1000, y))
         ctrl.add_link(bt + '.Transform.Translation', add + '.A', False)
-        ctrl.add_link(scale + '.Result', add + '.B', False)
+        ctrl.add_link(mask + '.Result', add + '.B', False)
 
-        make = unit(ctrl, 'RigVMFunction_MathTransformMake', 'MAKE_%s' % bone, (1040, y))
+        make = unit(ctrl, 'RigVMFunction_MathTransformMake', 'MAKE_%s' % bone, (1240, y))
         ctrl.add_link(add + '.Result', make + '.Translation', False)
         ctrl.add_link(bt + '.Transform.Rotation', make + '.Rotation', False)
         ctrl.add_link(bt + '.Transform.Scale3D', make + '.Scale', False)
@@ -208,8 +213,10 @@ def main():
 
     cases = {
         'L_x+10': {'L': (10.0, 0.0, 0.0)},
+        'L_y+10': {'L': (0.0, 10.0, 0.0)},
         'L_z+10': {'L': (0.0, 0.0, 10.0)},
         'R_x+10': {'R': (10.0, 0.0, 0.0)},
+        'R_y+10': {'R': (0.0, 10.0, 0.0)},
         'R_z+10': {'R': (0.0, 0.0, 10.0)},
     }
     for tag, vals in cases.items():

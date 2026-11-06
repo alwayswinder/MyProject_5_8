@@ -1,8 +1,12 @@
 # Seven 口型同步（UE 5.8）
 
-给 `Content/_MyTest/Mouth/Seven`（52 个 ARKit morph target）接上
+给 `/Game/_MyTest/Mouth/Mesh/Seven`（当前共 87 个 Morph Target，包含 ARKit 通道与自定义表情）接上
 Runtime MetaHuman Lip Sync 的**真实模型**（`URealisticMetaHumanLipSyncGenerator`），
 把 MetaHuman 的 81 个控制量映射成 ARKit blendshape 并每帧写进 mesh。
+
+> 2026-11-06 核对：本页保留历史调参图表，参数默认值以当前头文件为准，示例关卡覆盖值另列。
+> 当前关卡 Actor 已绑定上述 Mesh；C++ 构造函数仍查找已不存在的旧路径 `/Game/_MyTest/Mouth/Seven.Seven`，新放置 Actor 时需手动绑定，代码路径修复列为待办。
+> 文档入口与资产区别见 [README](README.md)。
 
 ## 状态
 
@@ -13,14 +17,14 @@ Runtime MetaHuman Lip Sync 的**真实模型**（`URealisticMetaHumanLipSyncGene
 | 测试关卡 | `/Game/_MyTest/Mouth/L_SevenLipSync`（已设为 EditorStartupMap / GameDefaultMap） |
 | 测试 Actor | `ASevenLipSyncActor`（C++，已放在关卡里，名为 `SevenLipSyncCamera`） |
 | 音频 | `TestAudio/SevenSpeech.wav`（16 kHz / 单声道 / 16 bit，**阿七原声**，循环播放） |
-| 日志 | `SevenLipSync: generator created / playing / jawOpen=... | audio=on queuedKB=...`（Output Log 过滤 `SevenLipSync`） |
+| 日志 | `SevenLipSync: generator created / playing / jawOpen=... \| audio=on availKB=...`（Output Log 过滤 `SevenLipSync`） |
 
 ## 语音素材（阿七原声）
 
 素材来自 `D:\AI\work\bili-audio\【刺客伍六七】伍六七语音包 320k.mp3`（时长 4:19），
 用 whisper(faster-whisper small) 转出了逐句时间轴：`Tools/aqi_transcript.json`。
 
-当前默认播放的是 **`0:106.6 – 0:113.2`**：
+默认音频在原片中的截取区间是 **1:46.55 – 1:53.20**（106.55–113.20 秒，另有首尾裁剪）：
 
 > 「我是刺客伍六七，刺客排行榜第 17369 位」
 
@@ -31,10 +35,12 @@ Runtime MetaHuman Lip Sync 的**真实模型**（`URealisticMetaHumanLipSyncGene
 | `aqi_alt_memory.wav` | 3:46.1 – 3:52.6 | 为什么我没有过去的记忆，我以前到底是一个怎么样的人 |
 | `aqi_alt_assassin.wav` | 3:04.0 – 3:07.4 | 就算是刺客，也会有想保护的人 |
 | `aqi_alt_shadow.wav` | 0:48.3 – 0:51.6 | 我是玄武国的暗影刺客 |
-| `SevenSpeech_tts_backup.wav` | — | 之前的中文 TTS 测试音（备份） |
 
-想换别的句子：在 `Tools/export_aqi_lines.py` 的 `CLIPS` 里加一条
-`(起始秒, 结束秒)`，重跑脚本就会输出 16 kHz 单声道 wav 到 `TestAudio/`。
+旧记录提到的 `SevenSpeech_tts_backup.wav` 当前目录不存在，不作为可选文件。
+
+想换别的句子：在 `Tools/export_aqi_lines.py` 的 `CLIPS` 字典里加一条
+`"文件名": (起始秒, 结束秒, "说明")`，执行 `python Tools/export_aqi_lines.py "<ffmpeg.exe 的完整路径>"`。
+脚本依赖 numpy、soundfile 和源音频，会重新生成字典内的 wav 到 `TestAudio/`。
 时间码从 `Tools/aqi_transcript.json` 里挑。
 
 > 版权提醒：这是《刺客伍六七》的角色原声，做内部测试/风格验证没问题，
@@ -56,15 +62,14 @@ Runtime MetaHuman Lip Sync 的**真实模型**（`URealisticMetaHumanLipSyncGene
 | `WavFile` | `TestAudio/SevenSpeech.wav` | 相对项目根目录；也支持绝对路径 |
 | `bAutoStart` | true | BeginPlay 自动播放 |
 | `bLoopAudio` | true | 播完循环（demo 用） |
-| `Gain` | 1.0 | 全局幅度，**所有**通道一起缩放（含 smile/frown/close），优先用它微调整体表情 |
+| `Gain`（组件）/ `LipSyncGain`（Actor） | 1.0 | 同一幅度设置，Actor 会每帧写入组件；在示例 Actor 上调 LipSyncGain |
 | `LipSyncJawOpenScale` | 1.0 | **只**缩放 `jawOpen`。嘴张太大 → 调到 0.6~0.7；想更夸张 → 1.2~1.5 |
 | `LipSyncJawOpenMax` | 0.60 | `jawOpen` 硬上限（0~1）。元音爆发时真实模型能给到 0.75，这里直接封顶 |
 | `LipSyncRoundingScale` | 1.0 | 缩放 `mouthFunnel` / `mouthPucker`（叠加在下巴张开上的那个「圆 O」） |
 | `LipSyncJawOpenFloor` | 0.10 | `jawOpen` 死区：低于它算闭嘴，见下一节 |
 | `LipSyncLipFollowJaw` | 1.0 | 唇形是否跟着下巴一起收，见下一节 |
 | `LipSyncOpenSpeed` / `LipSyncCloseSpeed` | 30 / 40 | 张嘴 / 闭嘴的插值速度 |
-| `LipSyncLookaheadMs` | 100 | 模型相对声卡时钟的前瞻补偿；嘴比声音**早**就调小，**晚**就调大 |
-| `LipSyncGain` | 1.0 | 整体幅度（映射表里 `jawOpen` 已单独 ×1.2） |
+| `LipSyncLookaheadMs` | 0 | 当前头文件与示例关卡均为 0 ms；嘴比声音早就调小，晚就调大 |
 | `LipSyncGateLowRms` | 0.015 | 静音门下限：RMS 低于它就闭嘴（语音 RMS 约 0.1，底噪约 0.007） |
 | `LipSyncGateHighRms` | 0.035 | 静音门上限：高于它全量驱动，中间线性过渡 |
 | `LoopGapSeconds` | 1.0 | 每轮之间的静音间隔 |
@@ -75,7 +80,7 @@ Runtime MetaHuman Lip Sync 的**真实模型**（`URealisticMetaHumanLipSyncGene
 
 ### 换音频
 
-1. 把 wav 放到 `TestAudio/` 下（任意采样率/位深都行，代码会解码并按 16 kHz 重采样；
+1. 把 wav 放到 `TestAudio/` 下（代码会解码并按 16 kHz 重采样；
    支持 PCM 8/16/24/32bit 和 float32，单/双声道）。
 2. 选中关卡里的 `SevenLipSyncCamera` → Details → `Seven / Audio / Wav File` 改成新路径。
 3. PIE 即可。
@@ -93,7 +98,7 @@ Runtime MetaHuman Lip Sync 的**真实模型**（`URealisticMetaHumanLipSyncGene
 ```
 
 一条记录 = 一个控制量（`GetControlValues()` 的 key）→ 一个 ARKit morph + 系数；
-同一个 morph 可以有多条（累加后 clamp 0..1）。要加通道就直接加行、重编译。
+同一个 morph 可以有多条。各项先乘映射系数、可选覆盖值和 Gain 后累加，再经过下巴整形、唇形跟随、0–1 clamp、静音门与插值。要加通道就加行、重编译。
 
 > 系数是 2026-11-02 按实测日志重新定过的：真实模型在台词里的原始输出大约是
 > `jaw 0.07~0.33`、`funnel 0.3~0.5`。原来 `jawOpen` 乘 2.2，峰值顶到 0.73，
@@ -103,7 +108,7 @@ Runtime MetaHuman Lip Sync 的**真实模型**（`URealisticMetaHumanLipSyncGene
 
 当前覆盖：jaw（open/forward/left）、上下唇、嘴角（smile/frown/stretch/dimple/sharpCornerPull）、
 funnel、pucker、lipsTogether→close/press、nasolabial→noseSneer、tongueOut；
-`bMouthOnly=false` 时额外驱动 brow / eyeBlink / eyeSquint / cheekSquint。
+`bMouthOnly=false` 时额外驱动 brow / eyeBlink / eyeSquint，并允许 noseSneer。当前 `IsMouthMorph()` 把 `cheek*` 也归为嘴部，因此 `cheekSquint` 在 true 时仍可被驱动；这与头文件“不碰 cheek”的注释不一致。
 
 ## 口型开合（「张太大」和「一直张着」）
 
@@ -129,7 +134,7 @@ funnel、pucker、lipsTogether→close/press、nasolabial→noseSneer、tongueOu
 三处改动，都在 [SevenLipSyncComponent.cpp](../Source/MyProject_5_8/LipSync/SevenLipSyncComponent.cpp)
 的 `UpdateMorphTargets()` 里，顺序是：映射累加 → 封顶 → 死区 → 唇形跟随下巴 → 静音门 → 插值。
 
-1. **下巴死区 `JawOpenFloor`（默认 0.10）**：低于它的 `jawOpen` 直接当 0，剩下的区间重新拉伸到 0~1。
+1. **下巴死区 `JawOpenFloor`（默认 0.10）**：先按 `JawOpenMax` 封顶，再计算 `max(0,(jawOpen-Floor)/(1-Floor))`。默认上限 0.60、死区 0.10 时，整形后的最大目标约为 0.556，后续还会受静音门与插值影响。
 2. **唇形跟随下巴 `LipFollowJaw`（默认 1）**：`jawOpen` 关到 0 时把 `mouthFunnel` /
    `mouthPucker` / `mouthLowerDown` 一起乘到 0（下巴开到 0.12 就完全恢复）。这条是关键——
    只压下巴的话，残留的 funnel/pucker 仍然会在嘴唇中间开个洞。
@@ -180,9 +185,8 @@ MorphScaleOverrides
   (mouthDimpleLeft, 0.0)
 ```
 
-> 这类 morph 拉扯本质上是这套 ARKit blend shape 在这张脸（`/Game/_MyTest/111/Seven`）上的
-> 权重问题：morph 本身没问题，是嘴角附近的蒙皮没有足够的过渡。所以真正的修法是"别让这些
-> morph 在闭嘴时还在动"（上面第 1 条），而不是把表情全部压平。
+> 历史画面和通道日志支持“闭嘴时残留嘴角 Morph 导致拉扯”，但没有单独证明根因是蒙皮权重或 Morph 本身。
+> 上述跟随/幅度调整属于运行时缓解。若需要修资产，应分别检查单个 Morph、组合形变、法线与材质，再决定修正方式。
 
 ### 参数
 
@@ -206,14 +210,13 @@ MorphScaleOverrides
 
 ## 身体动画（每轮重播一起重来）
 
-`Body Animation` 里挂一个 `UAnimSequence`，**每次播放开始（首播 + 每一轮循环）都会从第 0 帧
-重新播一遍**，这样音频和姿态永远从同一帧起步，循环几轮也不会越跑越偏。
+`Body Animation` 里挂一个 `UAnimSequence`，开启 `Restart Animation On Playback` 时，每次音频播放开始（首播 + 每一轮循环）都会重新触发身体动画。这样每轮重新对齐起点；音频设备延迟、动画长度和播放速率仍会影响实际同步，不能保证逐帧一致。
 
 | 参数 | 默认 | 说明 |
 |---|---|---|
-| `Body Animation` | `5秒台词测试_不带口型_Anim` | 要一起播的动画，可换任意 `AnimSequence` |
+| `Body Animation` | 组件默认空；当前关卡已配 `5秒台词测试_不带口型_Anim` | 当前路径 `/Game/_MyTest/Mouth/Mesh/5秒台词测试_不带口型_Anim`；可换 AnimSequence |
 | `Body Animation Rate` | 1.0 | 播放速率，1 = 原速 |
-| `Restart Animation On Playback` | ✅ | 关掉就只触发一次，之后让动画自己跑（不再对齐每一轮） |
+| `Restart Animation On Playback` | ✅ | 关闭后本组件不再调用 PlayAnimation，首播也不调用；身体动画需由其他逻辑启动 |
 
 实现位置：`USevenLipSyncComponent::StartAudio()`。首播和"无间隔循环"两条路径最后都收敛到
 这个函数，所以放在这里一次就够，不会漏。日志：
@@ -240,7 +243,7 @@ SevenLipSync: body animation restarted '5秒台词测试_不带口型_Anim' (rat
 
 ```
 SevenLipSync: audio queued 6.65s, playing=true
-SevenLipSync: jawOpen=... | audio=on queuedKB=-100   ← 这个数每 0.5s 掉 16KB，就是 32KB/s 的播放速率
+SevenLipSync: jawOpen=... | audio=on availKB=...   ← 队列余量随播放下降，16 kHz 单声道 PCM16 理论约 32 KB/s
 ```
 
 如果还是没声音，按顺序查：
@@ -255,16 +258,15 @@ SevenLipSync: jawOpen=... | audio=on queuedKB=-100   ← 这个数每 0.5s 掉 1
    `SevGame/.../Seven` 的贴图和 11 个 MI 都能正常加载了，之前的「纯色」是因为整批资产因
    引擎版本不匹配而根本没加载。仍有两个槽是默认材质：`Seven_Face_ncl_1`、`09_-_Default`
    （源项目里就没挂，`09 - Default` 是 3ds Max 默认材质名）。
-2. **没有身体动画**：mesh 直接播 Ref Pose（A-pose）。要站姿/呼吸/待机，需要给 Seven 建
-   AnimBP（Target Skeleton = `Seven_Skeleton`），再把 mesh 的 Anim Class 指过去；
-   口型是直接写 morph，**不会**被 AnimBP 覆盖。
-   注：`Seven_Hair_AnimBlueprint` 只是头发的 Post Process AnimBP（KawaiiPhysics），不算身体动画。
+2. **身体动画已接入示例关卡**：当前组件配置了不带口型的测试 AnimSequence，见“身体动画”一节。
+   AnimBP 是需要状态机/混合逻辑时的扩展；同名 Morph 曲线、其他 SetMorphTarget 写入者及单节点 PlayAnimation 都可能冲突，不能保证互不覆盖。
+   `Seven_Hair_AnimBlueprint` 是头发 Post Process AnimBP，不等同于身体动画逻辑。
 3. **没有麦克风/实时 TTS**：现在只有「wav 文件 → 口型」。要麦克风就装
    `RuntimeAudioImporter`（D 盘有 5.8 版），把 PCM 回调接到
    `StartPlayback` 同样的 `ProcessAudioData` 路径；要 TTS 就装 `RuntimeTextToSpeech` 5.8。
-4. **眨眼/视线没做**：`bMouthOnly=true` 时眼睛是静止的；真实模型本身有 eyeBlink 控制量，
-   想要的话把 `bMouthOnly` 关掉即可。
-5. **LOD**：morph 只在有 morph 的 LOD 上生效，远处切 LOD 后嘴会不动，属正常。
+4. **眨眼/视线**：`bMouthOnly=true` 会过滤 eyeBlink/eyeSquint，但仍可能驱动 cheekSquint；false 会允许映射表中的眉眼通道。当前没有 eyeLook 或眼球朝向映射，关闭此开关不会自动实现视线控制。
+5. **LOD**：每个目标 LOD 需有对应 Morph 数据。远处切 LOD 后嘴不动应检查该 LOD 的导入/构建设置，不能直接当作已验收行为。
+6. **新建 Actor 的网格路径待修复**：构造函数的旧路径当前不存在；已有测试关卡的实例绑定正确，不代表新建实例能自动找到 Mesh。本次仅整理文档，没有改 C++。
 
 ## 命令备忘
 
@@ -283,4 +285,4 @@ SevenLipSync: jawOpen=... | audio=on queuedKB=-100   ← 这个数每 0.5s 掉 1
   -Arguments '{"options":{"bSimulate":false,"playMode":"PlayMode_InViewPort","warmupSeconds":4}}'
 ```
 
-> 编译前必须关掉编辑器（模块 DLL 被占用）。改完 C++ 后重启编辑器才会加载新代码。
+> 直接用 Build.bat 重建 Editor 模块时，建议先关闭占用 DLL 的编辑器。Live Coding 是另一条编译路径，不能一律称为必须关闭；UCLASS/UPROPERTY 等反射结构改动宜完整重编并重启验证。

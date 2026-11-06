@@ -1,12 +1,14 @@
 # Seven 的 MetaHuman 身体控制器
 
+> 本页功能数据来自 2026-11-03。2026-11-06 只读核对：资产存在、BS_UP_TO_DATE，内部为 439 个骨骼元素、160 个控制；本次未重新执行完整身体动画/回解验收。文档入口见 [README](README.md)。
+
 已将 `D:/Unreal/Project/MetaHuman_58` 中的
 `/Game/MetaHumans/Common/Common/MetaHuman_ControlRig` 复制并适配到：
 
 `/Game/_MyTest/Mouth/Rig/CR_Seven_MetaHuman`
 
 目标网格为 `/Game/_MyTest/Mouth/Mesh/Seven.Seven`，其 `Default Animating Rig`
-已指定为上述控制器，预览网格也已设置为 Seven。
+在 2026-11-03 适配时指定为上述控制器，预览网格也设置为 Seven；默认绑定本次未重新核对，使用前在 Mesh 编辑器确认。
 
 ## 使用
 
@@ -33,6 +35,6 @@
 尚未用完整动画片段验证所有运动范围。
 
 本次迁移为身体控制器适配，不包含 MetaHuman 面部控制器迁移。
-详细数值、依赖清单及编辑器截图保存在 `Saved/Codex/MetaHumanSeven/`：
+历史数值、依赖清单及编辑器截图保存在本机 `Saved/Codex/MetaHumanSeven/`（Git 忽略，未随本文归档）：
 `functional_final.json`、`roundtrip_fkspine.json`、`final_audit.json`、
 `final_save.json` 和 `final_editor.png`。中间测试文件记录的是调试过程。

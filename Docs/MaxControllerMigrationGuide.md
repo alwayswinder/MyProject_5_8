@@ -2,11 +2,11 @@
 
 适用范围：把 3ds Max 里的面部控制器（`K_` 点、滑条、Animcraft 曲线手柄）在 UE 5.8 Control Rig 里复现成同样的手感。
 
-本文按 `CR_Seven_MorphSliders` 眉毛控制的三次重做整理，所有数值都是实测，不是推算。**先读第 5 节的踩坑表，能省掉大半返工。** 时间紧就直接照第 8 节 SOP 和第 9 节模板抄。
+本文来自 `CR_Seven_MorphSliders` 的眉毛迁移记录，混合了实测映射、经验和示例代码。2026-11-06 已补充眼睑诊断；历史端点测试不等于完整功能验收。先读第 5 节踩坑表与 [验证规范](ControlRigValidation.md)，再按第 8 节 SOP 操作。
 
-> 已经迁完、验证通过的部位（眉毛 10 个控制）整理在
-> [SevenFaceControllerRecipes.md](SevenFaceControllerRecipes.md)——那份文档不需要 Max 文件，
-> 照表就能从零搭建。本文只负责「新部位怎么查 Max、怎么迁、怎么验证」。
+> 已有 28 个眉眼控制的接口、历史数据和实现状态见 [控制器配方](SevenFaceControllerRecipes.md)。
+> 上眼睑的旋转迁移曾有明确错误；正式 Rig 已同步修正并于 12:24 做数值复核，完整验收仍待完成，最新结论与残余误差见 [SYP_R001Diagnosis.md](SYP_R001Diagnosis.md)。
+> 本文讲探测方法；配方讲已有映射；诊断讲个案证据，不能用历史“通过”覆盖新的缺陷。
 
 ---
 
@@ -14,13 +14,13 @@
 
 | 步骤 | 产出 | 判定标准 |
 |---|---|---|
-| 1. 查 Max | 控制器名、类型、父级、三轴各拖 10 后谁动、动多少 | 记录成「位移 → 位移」的系数 |
+| 1. 查 Max | 控制器、父级、约束目标、表达式、完整变换与顶点响应 | 平移记系数，旋转/枢轴记空间与求值顺序 |
 | 2. 搭 UE | 骨骼链、控制类型/形状/位置、RigVM 图 | 数值自检通过，且编辑器里拖得动 |
 | 3. 对轴向 | Space 选择 + 分量映射 | 单轴单拖，模型方向对 |
 
 顺序不能反。轴向问题必须在**单轴干净状态**下验证：一次只变一个分量。
 
-### 0.1 十分钟快速路径（按这个顺序，不要跳）
+### 0.1 迁移检查路径
 
 | # | 动作 | 工具 / 命令 | 验收 |
 |---|---|---|---|
@@ -33,11 +33,11 @@
 | 7 | 换算验证 | 3.1 | 用 2–3 根同名骨骼确认 Max→UE 公式 |
 | 8 | 读 UE 骨骼坐标 | `probe_ue_brow_bones.py` | 控制位置 = 目标骨骼静止世界坐标 |
 | 9 | 建控制 + 图 | 模板 B（改数据表即可） | 编译 `BS_UP_TO_DATE` |
-| 10 | 自检 | 模板 B 内置 | 单轴 1:1、无交叉、叠加正确 |
-| 11 | 截图 | `CaptureEditorImage`（ue-mcp.ps1） | 手柄贴在目标部位、大小合适 |
-| 12 | 保存 + 记文档 | `save_loaded_asset` | uasset 时间戳更新、指南补映射表 |
+| 10 | 数值对照 | 按验证规范补全模板 B 的自检 | 实例有效；完整变换、交叉与组合符合源 Rig |
+| 11 | 画面验收 | `Previewing Rig` + `CaptureEditorImage` | 手柄布局正确，行程内网格形变正确 |
+| 12 | 保存、重开、记文档 | `save_loaded_asset` + 重新加载验证 | 结构与求解保持一致，配方补映射和证据 |
 
-**时间参考**：本次六个点控从查 Max 到保存约 20 分钟；熟练后目标 10 分钟。
+历史六个平移点控的搭建约 20 分钟；旋转、约束和组合控制应按实际验证范围安排时间。
 
 ---
 
@@ -47,9 +47,9 @@
 
 | 现象 | 判定 |
 |---|---|
-| 拖控制器，网格顶点动，骨骼不动 | 纯 morph / BlendShape |
-| 拖控制器，骨骼动，顶点跟着骨骼走 | 纯骨骼 |
-| 两者一起变 | 两者都有（最常见） |
+| 顶点动，骨骼不动 | 继续检查 Morpher、FFD、Skin Wrap 等修改器，不能仅凭顶点变化判定为 morph |
+| 骨骼动，顶点跟随 | 至少有骨骼驱动，还需检查是否叠加 morph/修正变形 |
+| 骨骼与 Morpher 通道值都变 | 两路驱动，需记录叠加顺序 |
 
 面板类控制器（`Rectangle002` + `Circle113` + `Text001`）通常只是 UI，真正驱动的是挂在旁边的 `K_` 点或 Animcraft 曲线手柄。
 
@@ -71,19 +71,19 @@ pwsh -NoProfile -File Scripts\max_run.ps1 -ScriptFile Scripts\probe_animcraft_wo
 {"type":"maxscript","command":"( ...maxscript... )"}
 ```
 
-返回 `{"success":true,"result":"...","meta":{...}}`。`safeMode=true` 时 `doscommand` / `createfile` / `python.execute` 会被拦，其余照常执行。
+命名管道历史封装返回 `{"success":true,"result":"...","meta":{...}}`，当前 MCP 工具外层可返回 `ok/result/error`，以实际协议为准。优先用专用检查工具，自定义采样再用 MaxScript。Safe Mode 会拦截部分功能，本次 Python 执行也被拒绝；它不保证脚本只读或自动恢复场景。
 
 ### 1.3 探测脚本要点
 
 0. **先按前缀枚举，别直接猜对象名**：`for o in objects where (matchPattern o.name pattern:"zCircle*") collect o`，一次打印数量、类、父级、世界坐标。本次 49 个 `zCircle` 里只有 6 个是目标，目标靠「世界坐标 + 镜像成对」筛出来的。
-1. 打印控制器自身：`classOf`、`parent`、`pos`、`rotation`、`scale`、`position.controller` 的 list 各项。
+1. 打印 `classOf`、`parent`、完整 transform、position/rotation list 以及 `transform.controller`。若为 Link_Constraint，读 `getNumTargets()` / `getNode(i)`，沿约束目标查虚拟体；普通父节点不是约束目标。
 2. **用世界空间移动**再读结果，避免父级缩放干扰：
    ```maxscript
-   move n [10,0,0]     -- 世界位移
+   in coordsys world move n [10,0,0]     -- 显式世界位移
    ```
-   不要用 `n.pos += [10,0,0]`，那是父空间，遇到 `-0.94` 缩放会算错。
-3. 移动前后遍历 `objects` 比较 `(o.transform).row4`（Biped 对象没有 `.pos`，会报错）。
-4. 每次测完复位。**复位存 `transform` 而不是 `pos`**：`local saved = n.transform` … `n.transform = saved`，父级有旋转/缩放时只恢复 `pos` 会偏。
+   `.pos` 和移动都受坐标上下文影响，不应一律称为父空间。显式指定世界坐标，另记录父级缩放与控制限位。
+3. 比较完整 transform：row4 查位置，rotation/矩阵查朝向；只查位置会漏掉原地旋转的枢轴。统一读 transform，避免依赖不同类型节点的 `.pos` 行为。
+4. 保存完整 transform 和被修改的控制器各层原值，正常和异常路径都恢复并读回确认。复合控制器仅恢复 transform 不一定复原内部值；应恢复记录值，不能统一设为 0。
 5. 单次测试的位移阈值用 `> 0.002`，只打印命中的对象名 + 位移，否则几百个对象刷屏。
 6. 一次只测一个对象、一个轴；测完立刻复位再测下一个。
 
@@ -92,7 +92,7 @@ pwsh -NoProfile -File Scripts\max_run.ps1 -ScriptFile Scripts\probe_animcraft_wo
 **不能按名字或父子关系猜。** 本次 `zCircle` 是 `KPoint` 的子对象，但主动的是 `zCircle`，父级 `KPoint` 反而被表达式锁死。
 
 1. **看结构**：`position_list` 里有没有 `Position_Expression` / 约束 / wire。有表达式的点通常是从动。
-2. **世界移动**：`move n [10,0,0]`，比较所有对象 `transform.row4` 的前后差。
+2. **世界移动**：`in coordsys world move n [10,0,0]`，比较所有对象的位置与朝向；覆盖中性、有效行程和中间值。
 3. **看是否复位**：移动后对象立刻回到原值 → 被表达式/约束锁死，是从动点。
 
 | 移动后的现象 | 判定 | 本次例子 |
@@ -102,7 +102,7 @@ pwsh -NoProfile -File Scripts\max_run.ps1 -ScriptFile Scripts\probe_animcraft_wo
 | 只有自身动 | 纯显示/形状（或只驱动顶点 morph） | 纯 UI 面板 |
 | 自身不动（被弹回） | 从动点，被表达式锁定 | `KPoint051`（`MeiMao_SX` 表达式） |
 
-> 表达式控制器**读不到变量绑定**（见 1.4），所以「它绑在谁身上」这个问题只能靠移动响应反推，不要试图枚举。
+> 旧脚本未成功读取表达式绑定（见 1.4），不代表所有 API 都不可读。能读取的约束目标与绑定先记录，再以响应采样确认。
 
 ### 1.4 表达式控制器
 
@@ -113,7 +113,7 @@ local expr = (getNodeByName "meibu_R")[#Transform][#Position][2].controller
 expr.getExpression()
 ```
 
-但**变量绑定读不到**：`getNumVariables` / `getVariableName` / `getVariableTarget` 在这版全报错。别猜绑定，直接移动控制器看骨骼世界位移，用实测反推。
+旧脚本调用 `getNumVariables` / `getVariableName` / `getVariableTarget` 失败，只说明这些接口或调用不适用。不要因此跳过 Link_Constraint、参数连线等可检查的绑定；无法解析的表达式记为待查，用受控采样检查完整变换及必要的顶点响应。
 
 ### 1.5 记录表（填完再进 UE）
 
@@ -145,7 +145,7 @@ expr.getExpression()
 
 ## 2. 第二步：UE 侧结构
 
-### 2.1 清空并全量重导骨骼
+### 2.1 需要全量重建时再清空并重导骨骼
 
 改资产前先备份：
 
@@ -153,7 +153,7 @@ expr.getExpression()
 Copy-Item Content\_MyTest\Mouth\Rig\CR_Seven_MorphSliders.uasset Saved\Codex\Backup\..._<时间戳>.uasset
 ```
 
-`Scripts/clear_rig.py` 做的事，顺序别乱：
+增量迁移不需要清空现有 Rig。`Scripts/clear_rig.py` 会删除已有控制和图，只用于明确的全量重建并提前备份。它做的事：
 
 1. 删掉除 `Begin` 外的所有 RigVM 节点（`ctrl.remove_node(n, False)`）
 2. 删控制、null（控制先删，避免父级删除报错）
@@ -231,7 +231,7 @@ h.set_control_shape_transform(k, shape_tf, False)  # current
 
 ### 2.4 控制挂哪儿
 
-父级用 `Root` 骨骼（世界变换是单位矩阵），再用 `set_control_offset_transform` 把 `initial/current` 都设成目标世界变换：
+当前静止网格实验的控制挂 Root；以下坐标是 Rig/组件空间。角色移动或头部动画时，应把控制与枢轴放到适当的 head 空间，不能把固定静止坐标当作通用方案。offset 的 initial/current 都要设置：
 
 ```python
 off = h.get_global_control_offset_transform(k)
@@ -270,7 +270,7 @@ h.set_control_offset_transform(k, off, False, True)  # current
 
 ### 3.2 GlobalSpace 还是 LocalSpace
 
-**结论：这套骨架用 `GlobalSpace` + `SetTransform`。**
+**这批平移控制使用 `GlobalSpace` + `SetTransform`；其他控制仍需分析局部空间。** GlobalSpace 在 Control Rig 内指 Rig/组件空间，不是关卡绝对世界空间。
 
 实测（`set_global_transform` 加 5 cm）：
 
@@ -286,7 +286,7 @@ h.set_control_offset_transform(k, off, False, True)  # current
 ### 3.3 节点与引脚
 
 ```
-GetControlVector(CTRL, LocalSpace)          -- 控制值本身（挂在 Root 下，等价于世界）
+GetControlVector(CTRL, LocalSpace)          -- 控制通道值；全局映射取决于父级与 offset
    → VectorScale(Factor = 系数)
 GetTransform(bone, GlobalSpace, bInitial=True)
    .Transform.Translation → VectorAdd(B = 偏移)
@@ -313,8 +313,7 @@ Max 里拖 10 cm → 骨骼 5 cm，UE 控制设 `±10`、系数 `0.5`。
 
 ### 3.5 与已有控制叠加（同一根骨有多个控制源）
 
-同一根骨已经被一个控制驱动时，**不要**在后面再串一条 SetTransform——第二条要么读到已被改过的值，要么两条都读 `bInitial` 互相覆盖。
-正确做法是在 `MAKE` 之前插一个 `VectorAdd`，把两路偏移加在一起：
+本例两路都是纯平移，若两条 SetTransform 都从初始姿态构造目标，后者会覆盖前者。因此在 MAKE 前求偏移和，再设置一次。旋转、枢轴或明确有顺序的解算器需按各自空间合成；串行 SetTransform 本身并非一律错误：
 
 ```
 GetTransform(bone, Global, bInitial=True).Translation
@@ -326,11 +325,12 @@ GetTransform(bone, Global, bInitial=True).Translation
 
 ```python
 # 先断开 MAKE 原来的 Translation 连接，再接回
-ctrl.break_link('BROW_MAKE_%s.Translation' % bone)
+ctrl.break_all_links('BROW_MAKE_%s.Translation' % bone, True, False, False)
 ctrl.add_link(add2 + '.Result', 'BROW_MAKE_%s.Translation' % bone, False)
 ```
 
-- `RigVMController.break_link(pin_path)` 存在；`add_link` **不会**自动替换旧连接。
+- UE 5.8.3 的 `break_link(output_pin_path, input_pin_path, ...)` 必须给出连接两端；要断开某个输入引脚的所有连接，用上面的 `break_all_links(pin_path, as_input=True, ...)`。重新接线前显式断开旧输入，并检查 `add_link` 返回值及最终连接。
+- 当前 `build_brow_points.py`、左右眉弯曲脚本仍调用单参数 `break_link` 并吞掉异常；不能把它们当作已验证的通用接线模板。此问题列为代码待修复，证据见 [复核快照](Evidence/control_rig_recheck_2026-11-06.json)。
 - 多条链共用 `bInitial=True` 的 GetTransform 是安全的，只要都读同一个初始值再相加。
 - 幂等脚本要用**独立前缀**（本次用 `BPT_`），不要复用会被其它脚本整体清掉的 `BROW_`。
 
@@ -338,13 +338,13 @@ ctrl.add_link(add2 + '.Result', 'BROW_MAKE_%s.Translation' % bone, False)
 
 ```
 BT_Get(bone, Global, bInitial=True).Transform.Rotation
-  → QuatMul(A=初始, B=Delta)   -- 世界 X 轴增量
+  → QuatMul(A=Delta_global, B=初始)   -- 增量已在 Rig 全局空间表达
   → MAKE.Rotation
-Delta = QuatFromAxisAndAngle(Axis=(1,0,0), Angle=-dEuler * deg2rad)
+Delta_global = QuatFromAxisAndAngle(Axis=已换算的全局轴, Angle=已验证的弧度角)
 ```
 
-- 用 `break_link('BROW_MAKE_<骨>.Rotation')` 断开原连接；
-- `A/B` 顺序与角度符号见 4.6——这两处错了会出现「角度对、方向乱」。
+- 用 `break_all_links('BROW_MAKE_<骨>.Rotation', True, False, False)` 断开原输入连接；
+- 局部增量右乘：`Initial * Delta_local`。顺序、轴的空间和符号须一起验证，不能一律取 `-dEuler`；眉毛历史写法见 4.6，完整要求见 [验证规范](ControlRigValidation.md)。
 
 ---
 
@@ -352,9 +352,9 @@ Delta = QuatFromAxisAndAngle(Axis=(1,0,0), Angle=-dEuler * deg2rad)
 
 ### 4.1 Max 侧
 
-`Animcraft_Right_Brow_Z_Ctrl` / `Animcraft_Left_Brow_Z_Ctrl`，各驱动本侧 `meibu_*` + 3 根眉骨，世界 X/Z 各 0.5 倍，Y 无效，左右互不影响。
+`Animcraft_Right_Brow_Z_Ctrl` / `Animcraft_Left_Brow_Z_Ctrl` 的 Max 历史实测：本侧 4 骨 X/Z 各 0.5 倍，Y 无效、左右独立。2026-11-06 已修 `build_brow_two.py`：逐分量乘 `(0.5,0,0.5)`，Y 实测为 0。
 
-子对象 `Animcraft_*_Brow_Ctrl` 位置被表达式锁死，拖动只有 0.1–0.8 cm 形状差，**不是可交互主控**，不要照它建控制。
+父级 `Animcraft_*_Brow_Z_Ctrl` 负责整体平移；子对象 `Animcraft_*_Brow_Ctrl` 负责三骨弯曲（见 4.6/4.7）。早期仅按单根骨斜率判断子对象不是控制器的结论不完整，不能省略弯曲功能。
 
 ### 4.2 UE 侧
 
@@ -366,15 +366,17 @@ Delta = QuatFromAxisAndAngle(Axis=(1,0,0), Angle=-dEuler * deg2rad)
 | 形状 | `Box_Thick`，橙色；尺寸走 shape transform `(0.42, 0.22, 0.05)`，控制自身缩放 `(1,1,1)` |
 | 位置 | `(4.0, 11.2, 161.2)` / `(-4.0, 11.2, 161.2)`，父 `Root` |
 | 骨骼 | L：`meibu_L` + `Bone007/008/009`；R：`meibu_R` + `Bone010/011/012` |
-| 系数 | `0.5` |
+| 系数 | X/Z 各 `0.5`，Y 为 `0` |
 
 ### 4.3 自检数据（实例化后骨骼世界位移，cm）
 
 | 输入 | 左眉 4 骨 | 右眉 4 骨 |
 |---|---|---|
 | `CTRL_BROW_L = (10,0,0)` | 全 +5 X | 0 |
+| `CTRL_BROW_L = (0,10,0)` | 0 | 0 |
 | `CTRL_BROW_L = (0,0,10)` | 全 +5 Z | 0 |
 | `CTRL_BROW_R = (10,0,0)` | 0 | 全 +5 X |
+| `CTRL_BROW_R = (0,10,0)` | 0 | 0 |
 | `CTRL_BROW_R = (0,0,10)` | 0 | 全 +5 Z |
 
 ### 4.4 复现
@@ -449,7 +451,7 @@ UE 实现：
 | 位置 | `(-2.2336, 11.5447, 162.256)`，父 `Root` |
 | 形状 | `Box_Thick`，青色 `(0.15, 0.85, 1.0)`，shape scale `(0.15, 0.10, 0.05)` |
 | 位置映射 | `c>0`: `(c/2)*D_pos`；`c<0`: `(-c/2)*D_neg` |
-| 旋转 | 绕世界 X 轴；`NewRot = Initial * Delta`，角度 = `-(dEuler)` |
+| 旋转 | 当前脚本 `Initial * Delta_local`，Axis=(1,0,0)，分支角度取负；完整朝向待按验证规范复测 |
 | 图 | `BPT_ADD_<骨>` → `ADD1(+分支偏移)` → `MAKE.Translation`；`MAKE.Rotation` 改接 `QROT` |
 | 分支节点 | `MathFloatGreater` + `MathVectorSelectBool` / `MathFloatSelectBool` |
 
@@ -465,10 +467,9 @@ UE 实现：
 
 - **实际拖动值才是准的**：手动 `controller[2].value = [0,2,-1]` 与拖动后读到的 `(0,2,-1)` 结果不同
   （limiter 的 z 不参与驱动）。一律以 `move` 后的骨骼世界位移为准。
-- **四元数合成顺序**：`MathQuaternionMul` 的 A/B 决定传入的轴是**世界轴**还是**局部轴**。
-  - 想让轴在世界空间生效（眼皮闭合这种）：`A=Delta, B=Initial`（`Delta * Initial`），并取 `-dEuler`；
-  - 用 `A=Initial, B=Delta` 时轴会被当成骨骼局部轴——眼睑会朝眼球里转、穿模（本次踩过）；
-  - 眉毛弯曲目前用的是局部写法（`Initial * Delta`）且自检通过，改它之前先复测欧拉差。
+- **四元数合成顺序**：全局增量左乘、局部增量右乘；先确定实际增量空间，再选择顺序。
+  当前眉毛脚本为 `Initial * Delta_local`，旧数据仅记录欧拉差；不能称作已证明世界轴正确。
+  眼睑即使用 `Delta * Initial`，若 Delta 的轴来自未转换的局部差，依然会错（见 SYP 诊断）。
 - **SelectBool 引脚**名是 `Condition` / `IfTrue` / `IfFalse`，不是 `bPickTrue` / `A` / `B`（写错直接 `Cannot find pin`）。
 
 复现：`python Scripts\ue_run.py Scripts\build_brow_bend.py`（幂等）
@@ -520,7 +521,7 @@ UE：`CTRL_BROW_L_BEND`，`POSITION`，±2，位置 `(3.17631, 11.5447, 162.256)
 | `GetTransform.Transform.Scale` | 报 `Cannot find pin` | 写 `Scale3D` |
 | `SetTransform` 连“Transform” | 找不到引脚 | 输入引脚叫 `Value` |
 | `RigHierarchy.set_translation` | `AttributeError` | 用 `set_global_transform` / `set_local_transform` |
-| 在脚本里 `inst.execute('Forwards Solve')` 于 debugged rig | 编辑器预览骨骼被推到世界某处 | 用 `create_control_rig()` 建临时实例自检 |
+| 在 debugged rig 直接求解或临时实例层级为空 | 预览状态被污染，或零变换造成假通过 | 用独立实例，检查元素存在，必要时 copy_hierarchy；见验证规范 |
 | 只看返回值不看画面 | 数值对、方向错 | 数值自检 + 编辑器截图双确认 |
 | 只测一侧 | 另一侧符号反了没发现 | 左右各测一遍 |
 | 拿 `import_bones` 返回值当骨骼总数 | 数量对不上 | 用 `get_all_keys()` 统计 |
@@ -536,7 +537,7 @@ UE：`CTRL_BROW_L_BEND`，`POSITION`，±2，位置 `(3.17631, 11.5447, 162.256)
 | 截图时没选中控制 | 手柄与骨骼线混在一起，看不清位置 | 先 `hc.set_selection([...])` 再 `CaptureEditorImage` |
 | Max 里拖 5/10/20 结果完全一样 | 以为数据测错 | 是 `float_limit`/约束 clamp，拖不出更多；改用 `controller[2].value` 扫值 |
 | 只恢复 `n.transform` 就以为复原了 | 复合控制器的值仍停在极限，后续基准全错 | 显式把 `controller[i].value` 设回原值 |
-| 旋转叠加后 pitch/yaw/roll 串味 | 四元数顺序或符号错 | `MathQuaternionMul` 用 `A=初始, B=增量`；角度取 `-dEuler`（4.6） |
+| 旋转角大小对、朝向不对 | 增量空间、轴、符号或乘法顺序错 | 全局增量左乘，局部增量右乘；对照完整四元数/矩阵，不能只套负号 |
 | `MathVectorSelectBool` 引脚写 `bPickTrue` | `Cannot find pin` | 引脚是 `Condition` / `IfTrue` / `IfFalse` |
 | shape_name 写成 `Box_thick` | 不报错，但显示回退成默认形状 | 用库里的准确大小写 `Box_Thick`（2.3） |
 | `CaptureEditorImage` 报 `Failed to capture any editor windows` | 编辑器不在前台/不在 rig 编辑器页 | 先 `OpenEditorForAsset` 打开 rig，再 `AppActivate` 编辑器进程后截图 |
@@ -547,9 +548,9 @@ UE：`CTRL_BROW_L_BEND`，`POSITION`，±2，位置 `(3.17631, 11.5447, 162.256)
 
 ## 6. 验证流程
 
-1. **数值**：`rig.create_control_rig()` → `request_init()` → 设控制值 → `execute('Forwards Solve')` → 读 `get_global_transform(bone).translation`，对比静止状态。每个控制 × 3 轴 × 左右都要跑。
-2. **交叉**：给 A 控制值时，B/C 骨骼必须是 0。只看「目标动了」不够，还要看「别的没动」。
-3. **叠加**：同一根骨有两个控制源时，两路同时给值，结果必须是两路位移之和（例：整体 10 → +5，点控 Z 10 → +10，最终 `(5,0,10)`）。
+1. **有效实例与数值**：按 [验证规范](ControlRigValidation.md) 检查临时实例层级和目标元素存在；必要时 copy_hierarchy，再初始化和求解。比较完整位置、朝向、必要的缩放；覆盖中间值、两侧和限位。旧脚本未包含这些断言，成功日志不能直接视为通过。
+2. **交叉**：给 A 控制值时，源 Rig 中应保持独立的 B/C 骨骼相对基准变换的偏移必须为 0；有意联动的骨骼按源 Rig 对照。不能把骨骼绝对变换要求为零。
+3. **叠加**：同空间纯平移应为偏移和（例如整体 X 10 + 点控 Z 10 → `(5,0,10)`）；旋转/枢轴按源变换顺序复现，并与 Max 组合输入对照。
 4. **画面**：`hc.set_selection(keys)` 选中控制，再 `CaptureEditorImage`，确认手柄位置、形状、大小、颜色。数值对但画面错，通常是坐标换算或父级空间问题。
 5. **持久化**：保存后重开资产，控制与节点都在、编译不报错、数值不变。
 
@@ -569,7 +570,8 @@ UE：`CTRL_BROW_L_BEND`，`POSITION`，±2，位置 `(3.17631, 11.5447, 162.256)
 | `Scripts/build_brow_bend.py` | 建右眉弯曲控制（多骨骼 + 旋转 + 分支）+ 自检（幂等） |
 | `Scripts/build_brow_bend_left.py` | 建左眉弯曲控制（右侧镜像）+ 自检（幂等） |
 | `Scripts/build_eye_points.py` | 建左右眼周 16 个点控 + 自检（幂等） |
-| `Scripts/build_eye_lid.py` | 建左右上眼皮闭合（轴角 + 位移叠加）+ 自检（幂等） |
+| `Scripts/build_eye_lid.py` | 已废弃直线位置实现，只供历史对照，不推荐运行 |
+| `Scripts/build_eye_lid_arc.py` | 圆弧位置 + 世界旋转轴修正版；正式 Rig 已同步并于 12:24 数值复核，画面未验收 |
 | `Scripts/set_lid_single_side.py` | 把上眼皮控制限值改成单侧（X/Y=0，Z∈[-10,0]），幂等 |
 | `Scripts/probe_lid_limits.py` | 验证上眼皮限值（越界值回夹）与骨骼端点 |
 | `Scripts/fix_brow_exec.py` | 修复执行流断链（Begin→BROW→EYE），重接眉毛链 |
@@ -589,7 +591,7 @@ UE：`CTRL_BROW_L_BEND`，`POSITION`，±2，位置 `(3.17631, 11.5447, 162.256)
 | `Scripts/ue_run.py` | 在运行中的编辑器里执行 Python |
 | `Saved/Codex/Backup/` | 改动前的 `.uasset` 备份 |
 
-> 改资产前先 `Copy-Item` 备份 `.uasset`，再把脚本包在 `unreal.ScopedEditorTransaction` 里，方便撤销。
+> 改资产前先 `Copy-Item` 备份 `.uasset`，再把脚本包在 `unreal.ScopedEditorTransaction` 里，方便撤销。这些构建脚本的 `ASSET` 固定指向正式 Rig；在副本试验时须复制脚本并统一修改目标路径，打开副本不会自动重定向脚本。
 
 ---
 
@@ -609,7 +611,7 @@ UE：`CTRL_BROW_L_BEND`，`POSITION`，±2，位置 `(3.17631, 11.5447, 162.256)
 
 1. **枚举**（模板 A 的 A1 段）：拿到对象名、`classOf`、父级、世界坐标；同名前缀全列出来。
 2. **结构**（模板 A 的 A2 段，同一脚本顺带输出）：`position_list` 每一层、`Position_Expression` 公式、有没有 wire/约束。
-3. **移动矩阵**（模板 A 的 A3 段）：每个候选对象 × 三轴，各 `move` 10 cm，记录命中对象与位移；只用 `transform.row4` 比较，阈值 0.002。
+3. **移动矩阵**（模板 A 的 A3 段）：每个候选对象 × 三轴，在明确空间内移动并记录控制实际值；比较完整 transform，位置阈值 0.002 cm，朝向另设阈值。
 4. **判定**（1.3.1）：区分主动控制 / 从动点 / 纯形状。
 5. **配对**（1.6）：按坐标找镜像，左右各复测一遍。
 6. **填表**（1.5）：把系数写成 `骨骼位移 ÷ Max 位移`。
@@ -618,7 +620,7 @@ UE：`CTRL_BROW_L_BEND`，`POSITION`，±2，位置 `(3.17631, 11.5447, 162.256)
 
 1. 读目标骨骼的静止世界坐标（`probe_ue_brow_bones.py`，改 `names` 列表）。
 2. 复制模板 B（`build_brow_points.py`），只改顶部 `POINTS` 表与控制前缀。
-3. 跑脚本，看返回的 JSON 自检：
+3. 跑脚本，按 [验证规范](ControlRigValidation.md) 检查实例有效，再看返回的 JSON 自检。以下是纯平移点控的预期，不能推广到旋转/枢轴：
    - 每个控制单轴 `10` → 对应骨 `10`，其余 `0`；
    - 左右互不影响；
    - 叠加项 = 两路系数之和。
@@ -631,7 +633,7 @@ UE：`CTRL_BROW_L_BEND`，`POSITION`，±2，位置 `(3.17631, 11.5447, 162.256)
    [IO.File]::WriteAllBytes("Saved\Codex\shot.png", [Convert]::FromBase64String($json.returnValue.data))
    ```
 
-5. `save_loaded_asset` 保存，记下资产时间戳。
+5. `save_loaded_asset` 保存，重开后复测结构与数值，并归档输入、误差及未测范围。
 
 ### 8.4 收尾（2 分钟）
 
@@ -703,7 +705,7 @@ UE：`CTRL_BROW_L_BEND`，`POSITION`，±2，位置 `(3.17631, 11.5447, 162.256)
             local saved = n.transform
             for ax in #([10,0,0], [0,10,0], [0,0,10]) do
             (
-                move n ax
+                in coordsys world move n ax
                 out += "  +" + (pstr ax) + "\n" + (diffReport base (snapAll()))
                 n.transform = saved
             )
@@ -713,12 +715,12 @@ UE：`CTRL_BROW_L_BEND`，`POSITION`，±2，位置 `(3.17631, 11.5447, 162.256)
 )
 ```
 
-> 只读安全：脚本不改场景（移动后已复位）。`safeMode=true` 下可用。
+> 此模板会临时移动场景，不是只读脚本，也没有完整的异常恢复。只适用于已确认的简单变换控制；含 limiter、表达式、复合控制器的对象必须补充各层原值保存与异常恢复，并检查恢复结果。Safe Mode 不提供这些保证。
 > 可运行版：`Scripts/probe_template_a.ms`（改 `TARGETS` 后直接发）。
 
 ### 9.2 模板 B：UE 侧批量建控制
 
-直接复制 `Scripts/build_brow_points.py`，改这四处：
+直接复制 `Scripts/build_brow_points.py`，先修改 `ASSET` / `MESH` 指向本次目标，再改以下四处。该脚本依赖已有 `BROW_VADD_*` / `BROW_MAKE_*` 节点；迁移其他部位还须调整接线，不能只改数据表：
 
 | 常量 | 含义 |
 |---|---|
@@ -732,15 +734,15 @@ UE：`CTRL_BROW_L_BEND`，`POSITION`，±2，位置 `(3.17631, 11.5447, 162.256)
 - 幂等清理（删 `PREFIX` 节点 + 本批控制）
 - 控制创建（POSITION / 显示名 / 橙色 / 限值）
 - `set_control_shape_transform` 双写（initial + current）
-- 与已有控制相加（`break_link` + `VADD2`）
-- 自检（单轴 × 方向、交叉、叠加）并打印 JSON
+- 与已有控制相加（`VADD2`；原脚本的单参数 `break_link` 需改为正确 API，见 3.5）
+- 历史自检（单轴 × 方向、交叉、叠加）并打印 JSON；需补充实例有效性断言，不能只看返回成功
 
 新增一批控制后，记得同步更新第 7 节索引和对应映射表。
 
 > 如果目标控制器驱动多根骨骼、带旋转或分段（如 4.6 / 4.7 的眉毛弯曲），模板以
 > `Scripts/build_brow_bend.py`（右）和 `build_brow_bend_left.py`（左，镜像数据）为准：
 > 它们演示了 `float_limit` 值扫描、正负分支、`MathVectorSelectBool` / `MathFloatSelectBool`
-> 和 `QuatMul` 旋转叠加。
+> 和 `QuatMul` 旋转叠加。两份脚本仍需按当前验证规范补查实例层级与完整朝向。
 
 ### 9.3 反模式（这些都会导致返工）
 
