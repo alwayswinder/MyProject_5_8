@@ -1,6 +1,6 @@
 # 六个嘴唇控制（2026-11-06）
 
-已接入 `/Game/_MyTest/Mouth/LidDiagnostic/CR_Seven_LidWorldRotation`，完成该批次时为 **149 骨、36 控制、506 节点**。随后添加[左右脸颊](CheekControls.md)，当前为 149 骨、38 控制、650 节点；本页报告仍为六唇控批次快照。新增六个控制，保留原有眉眼控制。数值验证、保存和包重载通过；画面效果由用户检查，尚未记录本组效果验收。
+已接入 `/Game/_MyTest/Mouth/LidDiagnostic/CR_Seven_LidWorldRotation`，完成该批次时为 **149 骨、36 控制、506 节点**。随后添加[左右脸颊](CheekControls.md)、[鼻子](NoseControl.md)及[三嘴控](MouthControls.md)，当前为 149 骨、42 控制、1226 节点；本页报告仍为六唇控批次快照。新增六个控制，保留原有眉眼控制。数值验证、保存和包重载通过；画面效果由用户检查，尚未记录本组效果验收。
 
 ## 操作与映射
 

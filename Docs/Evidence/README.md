@@ -8,6 +8,8 @@
 | [XYP 下眼皮](XYP/README.md) | 2026-11-06 诊断 Rig 的左右下眼皮：Max 样本、解析分解参数、回归、数值与重载验证 |
 | [六个嘴唇控制](LipControls/README.md) | 2026-11-06 同一诊断 Rig 的六唇控：表达式、60 组样本、线性参数、旧控回归与保存重载 |
 | [左右脸颊控制](Cheeks/README.md) | 2026-11-06 同一诊断 Rig 的左右脸颊：54 组样本、正负分支和眼袋门控、参考姿势残差、嘴唇叠加回归与重载 |
+| [鼻子控制](Nose/README.md) | 2026-11-06 同一诊断 Rig：41 组源样本、世界轴映射、123 组旧控回归和 246 组混合、保存重载 |
+| [三嘴控](MouthControls/README.md) | 2026-11-06 同一诊断 Rig：125 组源嘴控、12 组源混合、20 骨位置和旋转、130 组旧控及 260 组组合、保存重载 |
 | [文档核对快照](docs_audit_2026-11-06.json) | 2026-11-06 在运行中的 UE 只读查询资产是否存在、层级/节点数、Morph 总数和已加载关卡 Actor 绑定 |
 | [正式 Rig 复核](control_rig_recheck_2026-11-06.json) | 12:24：330 节点、执行流、眉毛整体 12 组输入及眼睑 54 条变换对照；只读内存资产并求解临时实例 |
 | [复核采集脚本](recheck_control_rig.py) | 从项目根目录运行 `python Scripts/ue_run.py Docs/Evidence/recheck_control_rig.py`；不保存 Rig，重跑会覆盖上述复核 JSON |

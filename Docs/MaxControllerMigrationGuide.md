@@ -580,6 +580,10 @@ UE：`CTRL_BROW_L_BEND`，`POSITION`，±2，位置 `(3.17631, 11.5447, 162.256)
 | `Scripts/probe_cheek_samples.ms` / `fit_cheek_controls.py` | 左右脸颊 149 骨扫描、正负分支和眼袋 X 门控采样与参数；后者 `--prepare` 生成名单 |
 | `Scripts/build_cheek_controls.py` | 诊断副本添加左右脸颊，并接入共用人中的嘴唇叠加，详见 [脸颊控制](CheekControls.md) |
 | `Scripts/verify_cheek_controls.py` / `reload_cheek_target.py` | 脸颊绝对/增量误差、旧控回归、混合输入、重复求解及重载；保留并记录右脸颊参考姿势残差 |
+| `Scripts/probe_nose_samples.ms` / `fit_nose_controls.py` | 鼻子 149 骨扫描、41 组样本与世界轴映射；保存并恢复 Float Limit 下的原始值 |
+| `Scripts/build_nose_controls.py` / `verify_nose_controls.py` / `reload_nose_target.py` | 添加 `CTRL_NOSE`、完整变换/旧控/混合回归、包重载，详见 [鼻子控制](NoseControl.md) |
+| `Scripts/probe_mouth_samples.ms` / `fit_mouth_controls.py` | 三嘴控全骨与 Euler 层采样、分段位置和旋转基拟合；暂时归零并恢复 `jaw_move` Y，避免污染中性 |
+| `Scripts/build_mouth_controls.py` / `verify_mouth_controls.py` / `reload_mouth_target.py` | 在原唇控/脸颊输出前合并三嘴控贡献，保留执行链，源组合/旧控/重载验证，详见 [嘴部整体控制](MouthControls.md) |
 | `Scripts/fix_brow_exec.py` | 修复执行流断链（Begin→BROW→EYE），重接眉毛链 |
 | `Scripts/probe_all_controls2.py` | 一次跑完眉毛/眼周/眼皮的驱动自检（精简位移摘要） |
 | `Scripts/probe_eye_r.ms` / `probe_eye_l.ms` | Max 侧眼周 zCircle 结构与驱动响应 |

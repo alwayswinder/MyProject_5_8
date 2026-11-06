@@ -2,7 +2,7 @@
 
 实现资产：`/Game/_MyTest/Mouth/LidDiagnostic/CR_Seven_LidWorldRotation`。
 
-在原诊断副本上增量添加左右下眼皮，完成时为 149 骨、30 控制、394 节点。随后添加[六个嘴唇控制](LipControls.md)和[左右脸颊](CheekControls.md)，当前为 149 骨、38 控制、650 节点；本页下眼皮采样与报告仍为该批次历史快照。正式资产 `CR_Seven_MorphSliders` 未在本任务中修改。2026-11-06 用户检查后确认“效果没问题”，本次左右下眼皮效果验收通过。
+在原诊断副本上增量添加左右下眼皮，完成时为 149 骨、30 控制、394 节点。随后添加[六个嘴唇控制](LipControls.md)、[左右脸颊](CheekControls.md)、[鼻子](NoseControl.md)及[三嘴控](MouthControls.md)，当前为 149 骨、42 控制、1226 节点；本页下眼皮采样与报告仍为该批次历史快照。正式资产 `CR_Seven_MorphSliders` 未在本任务中修改。2026-11-06 用户检查后确认“效果没问题”，本次左右下眼皮效果验收通过。
 
 ## 操作
 
