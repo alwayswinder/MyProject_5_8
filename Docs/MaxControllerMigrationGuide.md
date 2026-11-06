@@ -465,9 +465,10 @@ UE 实现：
 
 - **实际拖动值才是准的**：手动 `controller[2].value = [0,2,-1]` 与拖动后读到的 `(0,2,-1)` 结果不同
   （limiter 的 z 不参与驱动）。一律以 `move` 后的骨骼世界位移为准。
-- **四元数合成顺序**：`MathQuaternionMul` 要 `A=初始旋转, B=增量`（`Initial * Delta`），
-  并且增量角度取 `-dEuler`——UE 的 Rotator.Roll 与 Max 欧拉 X 方向相反。
-  用 `Delta * Initial` 会变成绕骨骼局部轴，结果 pitch/yaw/roll 全部串味。
+- **四元数合成顺序**：`MathQuaternionMul` 的 A/B 决定传入的轴是**世界轴**还是**局部轴**。
+  - 想让轴在世界空间生效（眼皮闭合这种）：`A=Delta, B=Initial`（`Delta * Initial`），并取 `-dEuler`；
+  - 用 `A=Initial, B=Delta` 时轴会被当成骨骼局部轴——眼睑会朝眼球里转、穿模（本次踩过）；
+  - 眉毛弯曲目前用的是局部写法（`Initial * Delta`）且自检通过，改它之前先复测欧拉差。
 - **SelectBool 引脚**名是 `Condition` / `IfTrue` / `IfFalse`，不是 `bPickTrue` / `A` / `B`（写错直接 `Cannot find pin`）。
 
 复现：`python Scripts\ue_run.py Scripts\build_brow_bend.py`（幂等）
@@ -539,6 +540,8 @@ UE：`CTRL_BROW_L_BEND`，`POSITION`，±2，位置 `(3.17631, 11.5447, 162.256)
 | `MathVectorSelectBool` 引脚写 `bPickTrue` | `Cannot find pin` | 引脚是 `Condition` / `IfTrue` / `IfFalse` |
 | shape_name 写成 `Box_thick` | 不报错，但显示回退成默认形状 | 用库里的准确大小写 `Box_Thick`（2.3） |
 | `CaptureEditorImage` 报 `Failed to capture any editor windows` | 编辑器不在前台/不在 rig 编辑器页 | 先 `OpenEditorForAsset` 打开 rig，再 `AppActivate` 编辑器进程后截图 |
+| 眼皮控制套用 ±10 双向限值 | 向上拖眼皮反向翻转、穿模；Max 里这个方向拖不动 | 限值改单侧：X/Y 锁 0、Z ∈ [-10,0]（`set_lid_single_side.py`） |
+| 重建带 `Execute` 引脚的链后没检查执行流 | 眼睛能动、眉毛整条链拖不动（`Begin` 直连 EYE，BROW 悬空） | 重建脚本内置 `ensure_exec_chain`，或跑 `fix_brow_exec.py`；验收用 `probe_all_controls2.py` |
 
 ---
 
@@ -566,7 +569,13 @@ UE：`CTRL_BROW_L_BEND`，`POSITION`，±2，位置 `(3.17631, 11.5447, 162.256)
 | `Scripts/build_brow_bend.py` | 建右眉弯曲控制（多骨骼 + 旋转 + 分支）+ 自检（幂等） |
 | `Scripts/build_brow_bend_left.py` | 建左眉弯曲控制（右侧镜像）+ 自检（幂等） |
 | `Scripts/build_eye_points.py` | 建左右眼周 16 个点控 + 自检（幂等） |
+| `Scripts/build_eye_lid.py` | 建左右上眼皮闭合（轴角 + 位移叠加）+ 自检（幂等） |
+| `Scripts/set_lid_single_side.py` | 把上眼皮控制限值改成单侧（X/Y=0，Z∈[-10,0]），幂等 |
+| `Scripts/probe_lid_limits.py` | 验证上眼皮限值（越界值回夹）与骨骼端点 |
+| `Scripts/fix_brow_exec.py` | 修复执行流断链（Begin→BROW→EYE），重接眉毛链 |
+| `Scripts/probe_all_controls2.py` | 一次跑完眉毛/眼周/眼皮的驱动自检（精简位移摘要） |
 | `Scripts/probe_eye_r.ms` / `probe_eye_l.ms` | Max 侧眼周 zCircle 结构与驱动响应 |
+| `Scripts/probe_syp*.ms` | Max 侧 SYP 上眼皮控制结构、limiter 与轴角 |
 | `Scripts/probe_animcraft_rb*.ms` | Max 侧 Animcraft_Right_Brow_Ctrl 结构 / 值扫描 |
 | `Scripts/probe_animcraft_lb.ms` | Max 侧 Animcraft_Left_Brow_Ctrl 镜像数据 |
 | `Scripts/probe_quat_order.py` | 验证 UE 四元数合成顺序与轴（旋转类控制必查） |
