@@ -9,6 +9,7 @@
 | 查 Max 控制器并迁移到 UE | [控制器迁移指南](MaxControllerMigrationGuide.md) | 探测方法、空间换算、重建与验证流程 |
 | 根据已有数据搭眉毛、眼周控制 | [面部控制器配方](SevenFaceControllerRecipes.md) | 28 个骨骼控制的映射；眉毛整体与眼睑已有数值复核，其他历史验证范围另列 |
 | 定位 SYP_R001 穿模 | [眼睑诊断](SYP_R001Diagnosis.md) | 修正参数已同步到正式 Rig；12:24 复核最大朝向误差约 0.394°，画面验收待做 |
+| 使用 XYP 左右下眼皮 | [下眼皮实现](XYP_LowerLids.md) | 已添加到 LidDiagnostic 副本，向上拖 Z 0–10；数值与重载通过，2026-11-06 用户确认效果通过 |
 | 判断 Control Rig 测试是否可信 | [Control Rig 验证规范](ControlRigValidation.md) | 实例层级、全变换误差、交叉/叠加、预览与持久化 |
 | 操作七个 Morph 滑条 | [简易表情滑条](SevenFaceMorphRig.md) | 独立的 7 个 Float 控制，输出 Morph 曲线 |
 | 使用身体 IK/FK 与回解 | [MetaHuman 身体控制器](SevenMetaHumanControlRig.md) | 身体适配，不包含 MetaHuman 面部求解 |
@@ -23,7 +24,7 @@
 | `/Game/_MyTest/Mouth/Rig/CR_Seven_MorphSliders` | Max 骨骼控制迁移实验 | 12:24 快照：149 骨、28 控制、330 节点；眉毛 Y 已屏蔽，上眼睑旋转已修正，画面验收尚未完成 |
 | `/Game/_MyTest/Mouth/Rig/CR_Seven_FaceMorphs` | 七个 0–1 表情滑条 | 0 骨、7 控制、29 节点 |
 | `/Game/_MyTest/Mouth/Rig/CR_Seven_MetaHuman` | 身体控制器 | 439 个内部骨骼元素、160 控制；不能用网格 149 骨判断其层级是否正确 |
-| `/Game/_MyTest/Mouth/LidDiagnostic/CR_Seven_LidWorldRotation` | 旋转修正对照 | 诊断副本；不是正式眼睑修复版本 |
+| `/Game/_MyTest/Mouth/LidDiagnostic/CR_Seven_LidWorldRotation` | 上眼皮旋转修正 + XYP 下眼皮 | 149 骨、30 控制、394 节点；下眼皮数值与重载通过，2026-11-06 用户确认效果通过 |
 | `/Game/_MyTest/Mouth/L_SevenLipSync` | 口型测试关卡 | 存在；当前配置的启动/默认地图 |
 | `/Game/_MyTest/Mouth/Seven` | 旧网格路径 | 当前不存在；C++ Actor 构造函数仍引用它，见口型文档待办 |
 

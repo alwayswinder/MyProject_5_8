@@ -5,6 +5,7 @@
 | 记录 | 来源与范围 |
 |---|---|
 | [SYP_R001](SYP_R001/README.md) | 2026-11-06 Max / UE 眼睑变换、参考顶点、权重和旋转修正对照 |
+| [XYP 下眼皮](XYP/README.md) | 2026-11-06 诊断 Rig 的左右下眼皮：Max 样本、解析分解参数、回归、数值与重载验证 |
 | [文档核对快照](docs_audit_2026-11-06.json) | 2026-11-06 在运行中的 UE 只读查询资产是否存在、层级/节点数、Morph 总数和已加载关卡 Actor 绑定 |
 | [正式 Rig 复核](control_rig_recheck_2026-11-06.json) | 12:24：330 节点、执行流、眉毛整体 12 组输入及眼睑 54 条变换对照；只读内存资产并求解临时实例 |
 | [复核采集脚本](recheck_control_rig.py) | 从项目根目录运行 `python Scripts/ue_run.py Docs/Evidence/recheck_control_rig.py`；不保存 Rig，重跑会覆盖上述复核 JSON |
