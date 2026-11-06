@@ -574,6 +574,12 @@ UE：`CTRL_BROW_L_BEND`，`POSITION`，±2，位置 `(3.17631, 11.5447, 162.256)
 | `Scripts/build_eye_lid_arc.py` | 圆弧位置 + 世界旋转轴修正版；正式 Rig 已同步并于 12:24 数值复核，画面未验收 |
 | `Scripts/set_lid_single_side.py` | 把上眼皮控制限值改成单侧（X/Y=0，Z∈[-10,0]），幂等 |
 | `Scripts/probe_lid_limits.py` | 验证上眼皮限值（越界值回夹）与骨骼端点 |
+| `Scripts/probe_lip_samples.ms` / `fit_lip_controls.py` | 六个唇控的完整变换、Morph 差异与组合采样，生成线性位移参数 |
+| `Scripts/build_lip_controls.py` | 在诊断副本首次增量添加六唇控；检测已有节点时拒绝重复添加，详见 [嘴唇控制](LipControls.md) |
+| `Scripts/verify_lip_controls.py` / `reload_lip_target.py` | 六唇控与旧眉眼完整变换回归、混合输入、保存及重载 |
+| `Scripts/probe_cheek_samples.ms` / `fit_cheek_controls.py` | 左右脸颊 149 骨扫描、正负分支和眼袋 X 门控采样与参数；后者 `--prepare` 生成名单 |
+| `Scripts/build_cheek_controls.py` | 诊断副本添加左右脸颊，并接入共用人中的嘴唇叠加，详见 [脸颊控制](CheekControls.md) |
+| `Scripts/verify_cheek_controls.py` / `reload_cheek_target.py` | 脸颊绝对/增量误差、旧控回归、混合输入、重复求解及重载；保留并记录右脸颊参考姿势残差 |
 | `Scripts/fix_brow_exec.py` | 修复执行流断链（Begin→BROW→EYE），重接眉毛链 |
 | `Scripts/probe_all_controls2.py` | 一次跑完眉毛/眼周/眼皮的驱动自检（精简位移摘要） |
 | `Scripts/probe_eye_r.ms` / `probe_eye_l.ms` | Max 侧眼周 zCircle 结构与驱动响应 |
