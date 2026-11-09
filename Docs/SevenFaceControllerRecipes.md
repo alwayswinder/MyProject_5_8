@@ -426,7 +426,7 @@ python Scripts\ue_run.py Scripts\build_eye_points.py       # 配方 D（独立�
 - 弯曲控制只响应 **Z 轴**拖动，X/Y 无效（与 Max 一致）。
 - 左右弯曲的斜率**互相不镜像**（`D_pos/D_neg` 符号不同），不能直接套用一侧数据。
 - 控制父级均为 Root；点控与弯曲的驱动目标是对应眉骨，不驱动 `meibu_*`，只有整体控制带 `meibu_*`。
-- 本文件覆盖正式 Rig 的眉毛、眼周与上眼皮。诊断副本另有 [XYP 下眼皮](XYP_LowerLids.md)、[六个嘴唇控制](LipControls.md)、[左右脸颊](CheekControls.md)、[鼻子](NoseControl.md)及[左右嘴角与总嘴控](MouthControls.md)；下巴等尚未迁移。
+- 本文件覆盖正式 Rig 的眉毛、眼周与上眼皮。诊断副本另有 [XYP 下眼皮](XYP_LowerLids.md)、[六个嘴唇控制](LipControls.md)、[左右脸颊](CheekControls.md)、[鼻子](NoseControl.md)、[左右嘴角与总嘴控](MouthControls.md)、[左右眼球](EyeballControls.md)、[双眼总控](GazeMasterControl.md)、[下巴整体](ChinControl.md)及[四整体表情滑块](ExpressionSliders.md)；各部位验证范围见专文。
 - 眼周点控按每骨 1:1 实现；配方 E 的眼睑旋转已修正，仍有圆弧拟合残差、内眼角非线性和组合/画面验收待办。
 - 上眼皮限值单侧：**X/Y 锁 0，Z ∈ [-10, 0]**；与 Max 的局部限位 `[-1.75,0]` 按归一化值对应，不能从脚本增益推断真实世界拖动距离。
 - 四元数合成顺序取决于增量空间；当前眉毛脚本右乘局部增量，眼睑左乘全局增量。旧眼睑错误轴只保留在历史诊断记录中。

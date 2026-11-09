@@ -96,6 +96,8 @@ assert (closed.translation - baseline.translation).length() > 0.01, '目标骨�
 
 ## 6. 证据保存
 
+2026-11-06 左右眼球组合复核发现，`FRigComputedTransform::Equals` 默认以 `0.0001` 比较变换各分量；微小输入可能不触发层级写入。应另测连续切换与独立实例，记录缓存残差，并明确检查其符合引擎容差。独立实例的公式对照仍保持严格精度，不能直接放宽全部测试。实测及代码入口见 [眼球控制](EyeballControls.md)。
+
 每份报告写明日期、源资产、输入、预期值、实际值、误差与未测范围。需要交接的 JSON/图片放 `Docs/Evidence/` 或 `Docs/Images/`；`Saved/Codex/` 可保留原始调试过程，但该目录被 Git 忽略。
 
 当前眼睑的逐样本证据见 [Evidence/SYP_R001](Evidence/SYP_R001/README.md)，功能结论见 [SYP_R001Diagnosis.md](SYP_R001Diagnosis.md)。
