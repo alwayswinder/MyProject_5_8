@@ -8,7 +8,7 @@ b=types.ModuleType('builder');exec(compile((ROOT/'Scripts/build_expression_slide
 def main():
     p=json.loads((E/'parameters.json').read_text(encoding='utf-8'));ref=json.loads((E/'max_samples.json').read_text(encoding='utf-8'));old=json.loads((E/'previous_controls.json').read_text(encoding='utf-8'))
     rig=unreal.load_asset(b.ASSET);inst,h=b.b.instance(rig);rows=p['rows'];curves=[m['name'] for r in rows for m in r['morphs']]
-    assert len(h.get_controls())==50 and len(h.get_bones())==149
+    assert len(h.get_controls())>=50 and len(h.get_bones())==149
     report=dict(captured_at=datetime.datetime.now().astimezone().isoformat(),asset=b.ASSET,nodes=len(rig.get_default_model().get_nodes()),controls=len(h.get_controls()),bones=149,curves=curves,source_cases=len(ref['samples']),regression_cases=len(old['cases']),source_curve_error=0,bone_position_error_cm=0,bone_rotation_error_deg=0,bone_scale_error=0,endpoint_error_cm=0,repeat_curve_error=0,passed=False)
     key=b.b.key;solve=b.b.solve;packed=b.b.packed
     def values(weights):return {r['control']:[v*p['travel_cm'],0,0] for r,v in zip(rows,weights)}

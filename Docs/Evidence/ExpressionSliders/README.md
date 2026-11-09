@@ -14,4 +14,4 @@
 | [preview_morph_check.json](preview_morph_check.json) | 原有优化设置为 1 下，等待编辑器帧后读取最终动画曲线和 Morph 类型，结束恢复原输入 |
 | [pose_adapter_disabled_probe.json](pose_adapter_disabled_probe.json) | 排查时临时关闭优化后也能正确输出；最终已恢复原设置，不能据此归因为优化开关故障 |
 
-源采样只修改四个滑块，其他源控制保持当时值；四滑块的骨骼响应以本次中性为基准比较。画面由用户确认；操作见 [表情滑块](../../ExpressionSliders.md)。
+源采样只修改四个滑块，其他源控制保持当时值；四滑块的骨骼响应以本次中性为基准比较。画面由用户确认；操作见 [表情滑块](../../Recipes/ExpressionSliders.md)。

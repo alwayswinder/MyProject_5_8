@@ -4,7 +4,7 @@
 
 - Max：`D:/Download/Seven_Skin_New.max`，时间 0，SYP_R001 / SYP_L001 局部 Y 从 0 到 -1.75 的 9 个样本。探测后恢复输入。
 - UE 原 Rig：`/Game/_MyTest/Mouth/Rig/CR_Seven_MorphSliders`，预览网格 `/Game/_MyTest/Mouth/Mesh/Seven`，独立测试实例显式复制资产层级，控制 Z 从 0 到 -10。
-- 本目录“原 Rig”均指旋转修正前的历史状态。后续正式 Rig 已同步旋转参数，12:24 的新复核在上一级 [control_rig_recheck_2026-11-06.json](../control_rig_recheck_2026-11-06.json)；历史 JSON 保留原样。
+- 本目录“原 Rig”均指旋转修正前的历史状态。后续早期眉眼基线 Rig 已同步旋转参数，12:24 的新复核在上一级 [control_rig_recheck_2026-11-06.json](../control_rig_recheck_2026-11-06.json)；历史 JSON 保留原样。
 - 对照副本：`/Game/_MyTest/Mouth/LidDiagnostic/CR_Seven_LidWorldRotation`，只改世界旋转轴和对应角度系数，位置沿用原圆弧拟合。
 - 长度单位 cm；旋转四元数顺序 x/y/z/w。Max 原始四元数按 Max 约定保存，比较前使用本场景已核对的 UE 映射 `(x,-y,z,w)`；不能将其推广到任意 FBX 骨架。
 - 权重文件的 `p` 均已按点坐标 `(Max.x,-Max.y,Max.z)` 换到 UE 坐标；`lid_max_samples.json` 内 `p` 仍是原 Max 坐标。Max 顶点索引从 1 开始，UE 动态网格顶点索引从 0 开始，按参考位置匹配而非索引直接对应。
@@ -21,4 +21,4 @@
 
 匹配不是对全部模型/LOD 的一一拓扑证明；它支持眼睑区域没有明显位置或权重丢失的判断。原 Rig 最大旋转误差约 46.448°，对照副本最大约 0.394°，后者仍有约 0.340 mm 位置拟合误差，未完成所有组合姿势与画面验收。
 
-DQ 权重全零的结论来自 Max MCP 查询结果，未单独导出逐顶点 DQ JSON；不能把本页权重文件当作完整 DQ 证据。结论和复现边界见 [诊断报告](../../SYP_R001Diagnosis.md)。
+DQ 权重全零的结论来自 Max MCP 查询结果，未单独导出逐顶点 DQ JSON；不能把本页权重文件当作完整 DQ 证据。结论和复现边界见 [诊断报告](../../Troubleshooting/UpperEyelid.md)。

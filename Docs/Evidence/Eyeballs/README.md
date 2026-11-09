@@ -13,4 +13,4 @@
 
 采样临时归零 `YanJing_L001/R001/Zong001`、`SYP_L001/R001`、`XYP_L001/R001`，正常和异常路径均恢复保存的底层输入。其他源控制保留当时场景值；对照各自中性的完整变换增量，不把源场景全部绝对参考姿态视为 UE 参考姿态。
 
-眼皮组合中的上眼皮保留原近似误差，报告单列。`warm_cache_*` 为连续切换时的残差，并按 `FRigComputedTransform::Equals` 的分量容差检查；`regression_mixed_*` 为独立实例的严格公式复核。详见 [操作与边界](../../EyeballControls.md)。数值和持久化通过，画面由用户检查。
+眼皮组合中的上眼皮保留原近似误差，报告单列。`warm_cache_*` 为连续切换时的残差，并按 `FRigComputedTransform::Equals` 的分量容差检查；`regression_mixed_*` 为独立实例的严格公式复核。详见 [操作与边界](../../Recipes/EyeballControls.md)。数值和持久化通过，画面由用户检查。

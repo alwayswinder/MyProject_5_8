@@ -12,4 +12,4 @@
 | [reload_report.json](reload_report.json) | 包重载、完整执行链、复验、预览输入恢复及选中下巴控制 |
 | [travel_adjustment.json](travel_adjustment.json) | 用户要求行程缩为 1/3：旧 / 新限位、三倍增益、等效姿势对照、预览输入补偿及保存重载 |
 
-采样期间将 `jaw_move` 的 Y 临时归零，最终恢复它及 20 个相关控制的原始底层输入并读回检查；不保存 Max 场景。所有样本的有效 Morpher 通道未发现变化。原上眼皮近似误差单列，效果待用户检查；操作和验证边界见 [下巴整体](../../ChinControl.md)。
+采样期间将 `jaw_move` 的 Y 临时归零，最终恢复它及 20 个相关控制的原始底层输入并读回检查；不保存 Max 场景。所有样本的有效 Morpher 通道未发现变化。原上眼皮近似误差单列，效果待用户检查；操作和验证边界见 [下巴整体](../../Recipes/ChinControl.md)。
