@@ -4,7 +4,7 @@
 
 ## 操作与布局
 
-正面预览的右侧放置四行滑块，从上到下为 **慌张、无语、思考、尴尬**。各行使用不同颜色的球形手柄和轨道，行距 4 cm，轨道长 8 cm，手柄直径约 1 cm。层级中的显示名使用中文。
+四行滑块放在 **角色左侧、玩家视角右侧**，从上到下为 **慌张、无语、思考、尴尬**。各行使用不同颜色的球形手柄和轨道，行距 4 cm，轨道长 8 cm，手柄直径约 1 cm。层级中的显示名使用中文。
 
 | Max 控制 | UE 控制 | 显示名 | 同时驱动的两个 Morph |
 |---|---|---|---|
@@ -13,9 +13,9 @@
 | `Circle119` | `CTRL_EXPR_SIKAO` | 思考 | `Seven_Head_sikao`、`Seven_Pupil_sikao` |
 | `Circle120` | `CTRL_EXPR_GANGA` | 尴尬 | `Seven_Head_ganga`、`Seven_Pupil_ganga` |
 
-拖动球形手柄沿轨道向画面右侧增加表情，起点为 0，终点为完整表情。每个控制采用 `POSITION` 类型，局部 X 范围 0–8，局部 Y/Z 锁为 0，Initial 值为 0。可以分别设置权重或叠加四项；设 X=4 为一半，X=8 为最大。
+在玩家视角中，从轨道左端向右端拖动球形手柄增加表情，左端为 0，右端为完整表情。每个控制采用 `POSITION` 类型，局部 X 范围 0–8，局部 Y/Z 锁为 0，Initial 值为 0。可以分别设置权重或叠加四项；设 X=4 为一半，X=8 为最大。
 
-控制偏移绕 Z 转 180°，使局部正 X 朝向预览右侧（Rig 全局负 X）；四行起点为 `(-22,18,164/160/156/152)` cm，终点 X 为 −30 cm。面板使用固定 Rig 空间，未实现随头部动画移动。
+按用户截图确认的玩家视角，四行起点已改为 `(22,18,164/160/156/152)` cm，终点 X 为 30 cm。控制偏移旋转为单位四元数，局部正 X 与 Rig 全局正 X 一致，向玩家视角右侧增加权重。此次同时修正了首次布局的左右位置和滑动方向，原有表情输入值、8 cm 行程及 Morph 增益保持不变。面板使用固定 Rig 空间，未实现随头部动画移动。布局修正与重载证据见 [layout_adjustment.json](Evidence/ExpressionSliders/layout_adjustment.json)。
 
 ## 驱动与验证
 
@@ -57,5 +57,6 @@
 | `Scripts/reload_expression_sliders.py` | 验证、保存重载、复验、恢复预览并选中慌张滑块 |
 | `Scripts/probe_expression_preview.py` | 临时设置四滑块一半权重，等待编辑器帧后读取最终动画曲线与 Morph 类型，恢复输入 |
 | `Scripts/refresh_expression_preview.py` | 重新打开预览、保留控制输入并帧后检查，不修改全局设置 |
+| `Scripts/update_expression_slider_layout.py` | 修正到角色左侧 / 玩家右侧，并使玩家从左到右增加权重；保留预览输入、保存重载 |
 
 只复核：`python Scripts/ue_run.py Scripts/verify_expression_sliders.py`。

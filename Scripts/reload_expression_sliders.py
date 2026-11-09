@@ -4,9 +4,9 @@ from pathlib import Path
 import unreal
 ROOT=Path(unreal.Paths.convert_relative_path_to_full(unreal.Paths.project_dir()));E=ROOT/'Docs/Evidence/ExpressionSliders'
 
-def main():
+def main(preview_values=None):
     v=types.ModuleType('verify');exec(compile((ROOT/'Scripts/verify_expression_sliders.py').read_text(encoding='utf-8'),'verify','exec'),v.__dict__)
-    before=v.main();rig=unreal.load_asset(v.b.ASSET);build=json.loads((E/'build_report.json').read_text(encoding='utf-8'));preview=v.b.b.base.preview_values(rig) or build['preview_values'];helper=v.b.b.base.base.helper
+    before=v.main();rig=unreal.load_asset(v.b.ASSET);build=json.loads((E/'build_report.json').read_text(encoding='utf-8'));preview=(v.b.b.base.preview_values(rig) or build['preview_values']) if preview_values is None else preview_values;helper=v.b.b.base.base.helper
     links=helper.exec_links(rig.get_default_model());assert sorted(links)==sorted(tuple(x) for x in build['expected_execution_links'])
     adj={a.split('.')[0]:b.split('.')[0] for a,b in links};assert len(adj)==len(links);starts=set(adj)-set(adj.values());assert len(starts)==1
     cursor=starts.pop();assert cursor in ('Begin','BeginExecution');visited=[]

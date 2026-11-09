@@ -17,7 +17,7 @@
 | 使用左右眼球 | [眼球控制](EyeballControls.md) | `CTRL_EYEBALL_L/R`，拖动眼前目标框；眼皮 / 眼袋跟随、源对照、旧控组合及重载通过，画面待用户检查 |
 | 同时控制两眼 | [双眼总控](GazeMasterControl.md) | `CTRL_EYEBALL_MASTER`，橙黄色宽框带动左右目标，单眼输入仍独立；源组合、旧控和重载通过，画面待用户检查 |
 | 使用下巴整体 | [下巴整体控制](ChinControl.md) | `CTRL_CHIN`，行程缩至原 1/3：X 约 ±3.333、Y 0–16.667、Z −20–0，最大动作幅度保持；源组合、旧控与重载通过，画面待用户检查 |
-| 使用慌张、无语、思考、尴尬 | [四个整体表情滑块](ExpressionSliders.md) | `Circle117`–`Circle120`，正面预览右侧四行排列；各自同步驱动头部与瞳孔 Morph，8 cm 行程，独立 / 组合及重载通过，画面待用户检查 |
+| 使用慌张、无语、思考、尴尬 | [四个整体表情滑块](ExpressionSliders.md) | `Circle117`–`Circle120`，角色左侧 / 玩家右侧四行排列，从左向右增加权重；同步驱动头部与瞳孔 Morph，8 cm 行程，独立 / 组合及重载通过，画面待用户检查 |
 | 判断 Control Rig 测试是否可信 | [Control Rig 验证规范](ControlRigValidation.md) | 实例层级、全变换误差、交叉/叠加、预览与持久化 |
 | 操作七个 Morph 滑条 | [简易表情滑条](SevenFaceMorphRig.md) | 独立的 7 个 Float 控制，输出 Morph 曲线 |
 | 使用身体 IK/FK 与回解 | [MetaHuman 身体控制器](SevenMetaHumanControlRig.md) | 身体适配，不包含 MetaHuman 面部求解 |

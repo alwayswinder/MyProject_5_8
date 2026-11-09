@@ -38,7 +38,7 @@ def main():
                 st.minimum_value=h.make_control_value_from_vector(unreal.Vector());st.maximum_value=h.make_control_value_from_vector(unreal.Vector(p['travel_cm'],0,0))
                 ck=hc.add_control(row['control'],b.key('Root'),st,h.make_control_value_from_vector(unreal.Vector()),False,False);assert h.contains(ck)
                 for initial in (True,False):
-                    tf=unreal.Transform();tf.translation=unreal.Vector(*row['origin']);tf.rotation=unreal.Quat(0,0,1,0);h.set_control_offset_transform(ck,tf,initial,True)
+                    tf=unreal.Transform();tf.translation=unreal.Vector(*row['origin']);tf.rotation=unreal.Quat(*p['control_offset_rotation']);h.set_control_offset_transform(ck,tf,initial,True)
                     shape_tf=unreal.Transform();shape_tf.scale3d=unreal.Vector(1/diameter,1/diameter,1/diameter);h.set_control_shape_transform(ck,shape_tf,initial)
                 h.set_control_value(ck,h.make_control_value_from_vector(unreal.Vector()),unreal.RigControlValueType.INITIAL)
                 y=-200000-i*750
@@ -49,7 +49,7 @@ def main():
                     mul=unit('RigVMFunction_MathFloatMul',str(i)+'_GAIN'+str(j),500+j*450,y);link(clamp+'.Result',mul+'.A');default(mul+'.B',m['gain']/p['travel_cm'])
                     writer=unit('RigUnit_SetCurveValue',str(i)+'_SET'+str(j),750+j*450,y);default(writer+'.Curve',m['name']);link(mul+'.Result',writer+'.Value');link(tail,writer+'.ExecutePin');expected.append((tail,writer+'.ExecutePin'));tail=writer+'.ExecutePin'
                 rail=unit('RigVMFunction_DebugLineStripNoSpace',str(i)+'_RAIL',1500,y)
-                x,yy,z=row['origin'];end=x-p['travel_cm'];pts=[(x,yy,z-.5),(x,yy,z+.5),(x,yy,z),(end,yy,z),(end,yy,z+.5),(end,yy,z-.5)]
+                x,yy,z=row['origin'];end=x+p['travel_cm'];pts=[(x,yy,z-.5),(x,yy,z+.5),(x,yy,z),(end,yy,z),(end,yy,z+.5),(end,yy,z-.5)]
                 assert c.set_pin_default_value(rail+'.Points','('+','.join(b.base.vstr(v) for v in pts)+')',True,False)
                 default(rail+'.Color','(R=%.4f,G=%.4f,B=%.4f,A=1)'%tuple(v*.55 for v in row['color'][:3]));default(rail+'.Thickness',.8)
                 link(tail,rail+'.ExecutePin');expected.append((tail,rail+'.ExecutePin'));tail=rail+'.ExecutePin'

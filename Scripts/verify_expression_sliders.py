@@ -36,7 +36,7 @@ def main():
         ck=key(row['control'],unreal.RigElementType.CONTROL)
         for x in (-10,0,4,8,20):
             solve(inst,h,{row['control']:[x,3,-2]});v=h.get_vector_from_control_value(h.get_control_value(ck));clamped=max(0,min(8,x));assert (v-unreal.Vector(clamped,0,0)).length()<1e-6
-            want=unreal.Vector(*row['origin'])-unreal.Vector(clamped,0,0);report['endpoint_error_cm']=max(report['endpoint_error_cm'],(h.get_global_transform(ck).translation-want).length())
+            want=unreal.Vector(*row['origin'])+unreal.Vector(clamped,0,0);report['endpoint_error_cm']=max(report['endpoint_error_cm'],(h.get_global_transform(ck).translation-want).length())
             for m in row['morphs']:assert abs(outputs()[m['name']]-clamped/8*m['gain'])<1e-6
     h.reset_pose_to_initial(unreal.RigElementType.CONTROL);assert inst.execute('Forwards Solve');assert max(abs(v) for v in outputs().values())<1e-7;check_bones(neutral)
     assert report['source_curve_error']<1e-6 and report['repeat_curve_error']<1e-7 and report['endpoint_error_cm']<1e-5
