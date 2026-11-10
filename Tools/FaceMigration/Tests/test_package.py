@@ -56,6 +56,16 @@ class PackageTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             paths.output_path(self.project/'Content/data.json')
 
+    def test_project_side_evidence_wins_over_package_baseline(self):
+        baseline=self.data/'max_samples.json';baseline.write_text('package')
+        side=self.project/'Saved/FaceMigration/Characters/Seven/LipControls/max_samples.json'
+        side.parent.mkdir(parents=True);side.write_text('project')
+        self.assertEqual(paths.read_path(baseline).read_text(),'project')
+        self.ctx.initialize()
+        paths.output_path(baseline).write_text('task')
+        self.assertEqual(paths.read_path(baseline).read_text(),'task')
+        self.assertEqual(paths.character_output_path('LipControls/x.json').parent,side.parent)
+
     def test_current_report_cannot_fall_back_to_history(self):
         report=self.data/'build_report.json'
         report.write_text('{"passed":true}')

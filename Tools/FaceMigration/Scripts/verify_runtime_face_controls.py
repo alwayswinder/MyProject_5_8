@@ -28,6 +28,7 @@ SOURCE = _fm_asset('/Game/_MyTest/Mouth/LidDiagnostic/CR_Seven_LidWorldRotation'
 TARGET = _fm_asset('/Game/_MyTest/Mouth/TMp/NewControlRigRuntimeAsset')
 assert SOURCE != TARGET, '源和目标不能相同，禁止用自身对照证明迁移通过'
 E = _fm_tool('Docs/Evidence/SevenRuntime')
+EB = _fm_tool('Docs/Evidence')
 
 class RuntimeRig:
     def __init__(self, asset):
@@ -171,6 +172,129 @@ class AdaptVerifier(ast.NodeTransformer):
                 return ast.Constant(value='RuntimeAsset: fresh instance execution validated; no BlueprintStatus')
         return node
 
+def display_contract(phase='before_reload'):
+    """Compare the reference and target display contract and write layout_validation.json."""
+    source = unreal.load_asset(SOURCE)
+    target = unreal.load_asset(TARGET)
+    sh, th = source.get_hierarchy(), target.hierarchy
+
+    def row(h, element):
+        settings = h.get_control_settings(element)
+        parent = h.get_first_parent(element)
+        offset = h.get_global_control_offset_transform(element, True)
+        shape = h.get_global_control_shape_transform(element, True)
+        return {'display_name': str(settings.display_name),
+                'animation_type': str(settings.animation_type),
+                'control_type': str(settings.control_type),
+                'parent': [str(parent.name), str(parent.type)],
+                'shape_name': str(settings.shape_name),
+                'shape_color': [round(v, 4) for v in settings.shape_color.to_tuple()],
+                'shape_scale': [round(v, 6) for v in shape.scale3d.to_tuple()],
+                'offset_p': [round(v, 5) for v in offset.translation.to_tuple()],
+                'offset_r': [round(v, 6) for v in (offset.rotation.x, offset.rotation.y, offset.rotation.z, offset.rotation.w)],
+                'limits': [list(h.get_vector_from_control_value(settings.minimum_value).to_tuple()),
+                           list(h.get_vector_from_control_value(settings.maximum_value).to_tuple()),
+                           [[bool(settings.limit_enabled[i].minimum), bool(settings.limit_enabled[i].maximum)] for i in range(3)]],
+                'draw_limits': bool(settings.draw_limits), 'shape_visible': bool(settings.shape_visible),
+                'transient': bool(settings.is_transient_control),
+                'group_with_parent': bool(settings.group_with_parent_control)}
+
+    source_rows = {str(k.name): row(sh, k) for k in sh.get_controls()}
+    target_rows = {str(k.name): row(th, k) for k in th.get_controls()}
+    diffs = []
+    for name, reference in source_rows.items():
+        got = target_rows.get(name)
+        if got is None:
+            diffs.append({'control': name, 'field': 'missing_in_target'})
+            continue
+        for field, value in reference.items():
+            if isinstance(value, list) and value and isinstance(value[0], float):
+                if any(abs(a - b) > 1e-5 for a, b in zip(value, got[field])):
+                    diffs.append({'control': name, 'field': field, 'source': value, 'target': got[field]})
+            elif value != got[field]:
+                diffs.append({'control': name, 'field': field, 'source': value, 'target': got[field]})
+    rails = [str(n.get_name()) for n in source.get_default_model().get_nodes() if str(n.get_name()).endswith('_RAIL')]
+    target_rails = [str(n.get_name()) for n in target.get_editor_asset().get_default_model().get_nodes()
+                    if str(n.get_name()).endswith('_RAIL')]
+    libraries = [lib.get_path_name() for lib in target.get_editor_property('shape_libraries')]
+    shape_sets = {}
+    for path in libraries:
+        lib = unreal.load_asset(path)
+        names = []
+        if lib:
+            try:
+                names = [str(s.get_editor_property('shape_name')) for s in lib.get_editor_property('shapes')]
+            except Exception as exc:
+                names = ['ERR:' + str(exc)]
+        shape_sets[path] = names
+
+    def resolves(name):
+        prefix, _, short = name.rpartition('.')
+        if prefix:
+            return any(short in v and prefix.split('.')[-1] in k for k, v in shape_sets.items())
+        return any(name in v for v in shape_sets.values())
+
+    used = sorted({r['shape_name'] for r in target_rows.values()})
+    unresolved = [name for name in used if not resolves(name)]
+    report = {'captured_at': datetime.datetime.now().astimezone().isoformat(), 'phase': phase,
+              'reference': SOURCE, 'target': TARGET,
+              'controls_source': len(source_rows), 'controls_target': len(target_rows),
+              'control_names_equal': set(source_rows) == set(target_rows),
+              'display_differences': diffs, 'shape_libraries_target': libraries,
+              'shape_library_contents': {k: len(v) for k, v in shape_sets.items()},
+              'shape_names_used': used, 'shape_names_unresolved': unresolved,
+              'rail_nodes_source': len(rails), 'rail_nodes_target': len(target_rails),
+              'rails_equal': rails == target_rails,
+              'visual_acceptance': 'pending_user'}
+    report['passed'] = (not diffs and set(source_rows) == set(target_rows) and rails == target_rails
+                        and not unresolved)
+    # 固定报告名在 Evidence 根（Build.md 第 7 节）；同时保留 SevenRuntime 下的旧路径副本。
+    for target_path in (_fm_output(EB/'layout_validation.json'), _fm_output(E/'layout_validation.json')):
+        target_path.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding='utf-8')
+    return report
+
+
+# 只有这些部位把 previous_controls.json 当回归基线；verify_lower_lids.py 只读 max_samples.json，
+# 因此不参与谱系判定，但仍会运行。
+LEGACY_EVIDENCE = {'verify_lip_controls.py': 'LipControls',
+                   'verify_cheek_controls.py': 'Cheeks', 'verify_nose_controls.py': 'Nose',
+                   'verify_mouth_controls.py': 'MouthControls', 'verify_eyeball_controls.py': 'Eyeballs',
+                   'verify_gaze_master.py': 'GazeMaster', 'verify_chin_control.py': 'Chin',
+                   'verify_expression_sliders.py': 'ExpressionSliders',
+                   'verify_phoneme_sliders.py': 'PhonemeSliders',
+                   'verify_eye_expression_sliders.py': 'EyeExpressions',
+                   'verify_nose_side_controls.py': 'NoseSides'}
+
+
+def legacy_applicability():
+    """旧控回归只对“保留旧求解”的谱系有效；先证明基线同名同谱系，否则整段跳过。"""
+    curves = {str(c.name) for c in unreal.load_asset(TARGET).hierarchy.get_curves()}
+    empty_bones, stale_curves, missing = [], [], []
+    for folder in sorted(set(LEGACY_EVIDENCE.values())):
+        path = _fm_tool(f'Docs/Evidence/{folder}/previous_controls.json')
+        try:
+            data = json.loads(_fm_read(path).read_text(encoding='utf-8'))
+        except FileNotFoundError:
+            missing.append(folder)
+            continue
+        cases = data.get('cases', [])
+        if cases and all(not case.get('bones') for case in cases):
+            empty_bones.append(folder)
+            continue
+        stale = sorted({name for case in cases for name in (case.get('curves') or {})} - curves)
+        if stale:
+            stale_curves.append({'folder': folder, 'curves': stale[:5]})
+    reasons = []
+    if empty_bones:
+        reasons.append('case.bones 为空（期望全部骨保持中性）: ' + ', '.join(empty_bones))
+    if stale_curves:
+        reasons.append('历史曲线名不在当前层级: ' + ', '.join(f"{row['folder']}={row['curves']}" for row in stale_curves))
+    if missing:
+        reasons.append('缺少 previous_controls.json（该部位没有回归基线）: ' + ', '.join(missing))
+    status = 'applicable' if not reasons else 'not_applicable'
+    return status, '; '.join(reasons)
+
+
 def legacy_verifiers(phase):
     files=['verify_lower_lids.py','verify_lip_controls.py','verify_cheek_controls.py','verify_nose_controls.py',
            'verify_mouth_controls.py','verify_eyeball_controls.py','verify_gaze_master.py','verify_chin_control.py',
@@ -214,9 +338,22 @@ def legacy_verifiers(phase):
 def main(phase='before_reload'):
     _fm_output(E).mkdir(parents=True,exist_ok=True)
     transfer=structural_and_transfer(phase)
-    source=legacy_verifiers(phase)
+    display=display_contract(phase)
+    legacy_status,legacy_reason=legacy_applicability()
+    if legacy_status=='applicable':
+        source=legacy_verifiers(phase)
+        legacy_passed=all(r['passed'] for r in source)
+    else:
+        source=[]
+        legacy_passed=True
+        (_fm_output(E/phase/'source_verifiers.json')).write_text(json.dumps([],ensure_ascii=False,indent=2),encoding='utf-8')
     report=dict(captured_at=datetime.datetime.now().astimezone().isoformat(),target=TARGET,phase=phase,
-                passed=transfer['passed'] and all(r['passed'] for r in source),transfer_cases=transfer['cases'],
+                passed=transfer['passed'] and display['passed'] and legacy_passed,
+                transfer_passed=transfer['passed'],transfer_cases=transfer['cases'],
+                display_passed=display['passed'],display_differences=len(display['display_differences']),
+                display_unresolved_shapes=display['shape_names_unresolved'],
+                legacy_status=legacy_status,legacy_reason=legacy_reason,
+                legacy_passed=legacy_passed if legacy_status=='applicable' else None,
                 source_verifiers_passed=sum(r['passed'] for r in source),source_verifiers_total=len(source))
     (_fm_output(E/phase/'summary.json')).write_text(json.dumps(report,ensure_ascii=False,indent=2),encoding='utf-8')
     print(json.dumps(report,ensure_ascii=False))

@@ -53,6 +53,28 @@ class RuntimeFacePreviewProbe:
             self.h.set_control_value(self.key(name),self.h.make_control_value_from_vector(unreal.Vector(*value)))
         self.live.request_run_once_event('Forwards Solve')
 
+    def diagnose_stall(self):
+        """Preview stall has two layers: no evaluation, and no curve transfer to the mesh.
+
+        Force one solve on the live host and record Rig-hierarchy curves vs anim curves so the
+        report separates "solver did not run" from "mesh curves were not updated".
+        """
+        try:
+            rig_after={name:self.h.get_curve_value(unreal.RigElementKey(type=unreal.RigElementType.CURVE,name=name)) for name in self.expected}
+            self.live.execute('Forwards Solve')
+            rig_solved={name:self.h.get_curve_value(unreal.RigElementKey(type=unreal.RigElementType.CURVE,name=name)) for name in self.expected}
+            anim_after={name:self.anim.get_curve_value(name) for name in self.expected}
+            return {'host_time':self.live.get_absolute_time(),
+                    'rig_curves_before_execute_max':max(rig_after.values()),
+                    'rig_curves_after_execute_max':max(rig_solved.values()),
+                    'anim_curves_after_execute_max':max(anim_after.values()),
+                    'sample':{name:rig_solved[name] for name in list(rig_solved)[:2]},
+                    'verdict':('solver_runs_but_mesh_curves_stale'
+                               if max(rig_solved.values())>1e-5 and max(anim_after.values())<1e-5
+                               else 'solver_did_not_run' if max(rig_solved.values())<1e-5 else 'curves_transfer_partial')}
+        except Exception as exc:
+            return {'error':traceback.format_exc()[-400:]}
+
     def start(self):
         self.write()
         self.comp.set_update_animation_in_editor(True)
@@ -74,6 +96,8 @@ class RuntimeFacePreviewProbe:
                                    rig_half={name:self.h.get_curve_value(unreal.RigElementKey(type=unreal.RigElementType.CURVE,name=name)) for name in self.expected},
                                    half_inputs={row['control']:list(self.h.get_vector_from_control_value(self.h.get_control_value(self.key(row['control']))).to_tuple()) for row in self.rows},
                                    rig_absolute_time=self.live.get_absolute_time())
+                if self.result['half_error']>1e-5:
+                    self.result['stall_diagnosis']=self.diagnose_stall()
                 self.restore();self.phase='restored';self.frames=0;self.write();return
             restored={m['name']:max(0,min(8,self.saved[row['control']][0]))/8*m.get('gain',1.0) for row in self.rows for m in row['morphs']}
             err=max((self.h.get_vector_from_control_value(self.h.get_control_value(self.key(n)))-unreal.Vector(*v)).length() for n,v in self.saved.items())

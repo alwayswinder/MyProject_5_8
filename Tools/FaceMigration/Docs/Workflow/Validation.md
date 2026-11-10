@@ -127,11 +127,15 @@ assert (closed.translation - baseline.translation).length() > 0.01, '目标骨�
 
 2026-11-10 在新构建的 `NewControlRigRuntimeAsset1` 上复现同一现象：Rig 绝对时间停在 0.4 s、28 条 Morph 全 0、`half_error=0.50014`，连续两次 `refresh_runtime_face_preview.py` 都未恢复。因此 `verify_runtime_face_preview.py` 的前置断言阻止了 76 组逐控预览。判定与后续步骤见[预览停滞排障](../Troubleshooting/PreviewStall.md)；这条不能写成“数值通过即等价”，`delivery_check.json` 要保留 `normal_frame_preview.passed=false`。
 
+2026-11-10 第二轮在重建的 `NewControlRigRuntimeAsset` 上完全复现（时钟 0.4 s、`half_error=0.50014`、两次 refresh 无效），并补到一段更细的判定：在**同一个 live preview host** 上手动 `host.execute('Forwards Solve')` 后 Rig 层级曲线变成正确的 `0.50014`，而网格的动画曲线仍为 0。随后进一步确认：`host.set_absolute_time(1.0)` 能改时间，但 4 秒后仍为 1.0，激活编辑器窗口也无效——**组件根本没有被 tick**。所以可以确认的只有“预览 tick 不推进”这一层；“曲线没传给网格”目前无法单独证明（动画实例同样没被 tick）。`request_run_once_event('Forwards Solve')` 对该预览 host 无效，`request_evaluate()` 在 `ControlRig` 上不存在。记录时应写成“预览世界不 tick”，不要写成曲线绑定或求解错误。该判定已并入 `probe_runtime_face_morph_preview.py`：`half_error` 超阈值时自动写 `stall_diagnosis.verdict`（`solver_runs_but_mesh_curves_stale` / `solver_did_not_run` / `curves_transfer_partial`）。
+
+Max 抽检要按骨分别报数。2026-11-10 第二轮实测同一控制（`CTRL_EYE_LID_R`）下，主驱动骨 `Bone028` 误差 0.00344 cm / 0.0808°（约等于 6 位小数四元数量化下限），而 Link_Constraint 的次级骨 `Bone027` 在中间行程有 0.0208 cm / 0.4076° 的差异，两端趋零。只报整体 worst 会把这类差异藏起来；容差要按驱动关系区分并写明量化下限。轴向换算（本轮实测）：Max → UE 位置 `(x, -y, z)`、四元数 `(x, -y, z, w)`。
+
 ## 6. 证据保存
 
 2026-11-06 左右眼球组合复核发现，`FRigComputedTransform::Equals` 默认以 `0.0001` 比较变换各分量；微小输入可能不触发层级写入。应另测连续切换与独立实例，记录缓存残差，并明确检查其符合引擎容差。独立实例的公式对照仍保持严格精度，不能直接放宽全部测试。实测及代码入口见 [眼球控制](../Recipes/EyeballControls.md)。
 
-每份报告写明日期、源资产、输入、预期值、实际值、误差与未测范围。本次报告和必要图片写到目标项目 `Saved/FaceMigration/Jobs/<任务>/Current/Evidence/`。正式采纳的源采样、参数及回归基准归入 `Tools/FaceMigration/Characters/<角色>/Evidence/`；Seven 历史证据受摘要保护。临时调试写 Current/Temp，不自动复制整套输入或新增一套运行文档。
+每份报告写明日期、源资产、输入、预期值、实际值、误差与未测范围。本次报告和必要图片写到目标项目 `Saved/FaceMigration/Jobs/<任务>/Current/Evidence/`。原始采样、回归快照和图导出写 `Saved/FaceMigration/Characters/<角色>/`，不写回工具包；包内只保留 `parameters.json`、`bone_names.txt` 和小报告。正式采纳的新参数归入 `Characters/<角色>/Evidence/` 的 `parameters.json`；Seven 历史证据受摘要保护，已移出的批次记录在 `preservation.manifest.json` 的 `moved_out`。临时调试写 Current/Temp，不自动复制整套输入或新增一套运行文档。
 
 当前眼睑的逐样本证据见 [Evidence/SYP_R001](../../Characters/Seven/Evidence/SYP_R001/README.md)，功能结论见 [SYP_R001Diagnosis.md](../Troubleshooting/UpperEyelid.md)。
 

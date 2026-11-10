@@ -33,6 +33,41 @@
 
 同一目标的独立实例求解正常：1175 组迁移对照 worst 全 0，上眼皮 Max 抽检 0.00344 cm / 0.00059°。因此本轮把“数值/结构通过”和“正常帧预览未通过”分开记录，`delivery_check.json` 不写整体通过。
 
+## 2026-11-10 第二轮：重建目标复现，并细分出两层原因
+
+目标 `/Game/_MyTest/Mouth/TMp/NewControlRigRuntimeAsset`（空壳重建，1926 节点，保存重载通过后立即测）：
+
+| 项目 | 值 |
+|---|---|
+| `preview_component` | `World_23` / `World_25` / `World_27` 的 `AnimationEditorPreviewActor_0.ControlRigSkeletalMeshComponent_0` |
+| `rig_absolute_time` | `0.4`（两次 refresh、三次新组件均不变） |
+| `half_error` | `0.50014`；`rig_half` 与 `actual_half` 全 0 |
+| `restored_curve_error` / `restored_input_error` | `0.0` / `0.0`（输入恢复没问题） |
+| 组件状态 | `anim_instance=ControlRigLayerInstance`、`update_animation_in_editor=True`、`bPauseAnims=False`、`anim_mode=ANIMATION_CUSTOM_MODE` |
+
+**新判定（关键）**：在同一个 live preview host 上按顺序执行——
+
+| 步骤 | Rig 层级曲线 | 网格动画曲线 | 时间 |
+|---|---|---|---|
+| 写输入 `CTRL_EXPR_HUANGZHANG=(4,0,0)` | 0 | 0 | 0.4 |
+| `request_run_once_event('Forwards Solve')` | 0 | 0 | 0.4 |
+| `host.execute('Forwards Solve')` | **0.50014** | 0 | 0.4 |
+| `set_update_animation_in_editor(True)` | 0.50014 | 0 | 0.4 |
+
+即停滞有两层：(1) 预览 tick 不推进/不重算；(2) 即使手动算出 Rig 曲线，`ControlRigLayerInstance` → 网格动画曲线这一段也不更新。`ControlRig.request_evaluate()` 不存在（`AttributeError`）。判定时分开写这两层，不要用“改图/改增益”去修。
+
+**2026-11-10 补充（修正上一条）**：第 (2) 层目前**无法单独证明**——网格曲线为 0 也可能只是因为动画实例同样没有被 tick。能确认的只有第 (1) 层：
+
+| 操作 | 结果 |
+|---|---|
+| `host.set_absolute_time(1.0)` / `set_delta_time(1.0)` | 调用成功，`get_absolute_time()` 立即变 1.0 |
+| 等 4 秒后再读 | 仍是 1.0 → 组件**完全没有被 tick**，不是慢 |
+| 激活 UE 主窗口（`AppActivate`）后重读 | 仍是 1.0 |
+| `ObjectIterator` 枚举 | 只有 1 个属于目标 VM 的 host，不是选错实例 |
+| 组件属性 | 存在 `visibility_based_anim_tick_option`（按可见性决定是否 tick 动画） |
+
+因此现阶段结论是“预览世界没有 tick 这个组件”，最可能是资产编辑器视口的**实时/可见性状态**（`VisibilityBasedAnimTickOption` 门控），而不是 Rig 内容或曲线绑定。确认方法：在编辑器里打开目标资产、确保视口实时开启（`Ctrl+R` 切换）并点一下视口，看时间是否推进；或在关卡放一个临时 ControlRig actor 用 PIE 验证曲线能否到网格。
+
 ## 相关环境事实
 
 - 当前关卡 `L_SevenLipSync` 里没有 ControlRig actor，只有两个 SkeletalMeshActor，预览只能依赖资产编辑器的临时世界。

@@ -7,15 +7,11 @@
     "Characters/Seven/Evidence/Cheeks/axis_adjustment.json": "9296d53e4d79392557c268a54e589cb0423a8ff9f5bf6996002e31d038042afb",
     "Characters/Seven/Evidence/Cheeks/build_report.json": "4a6e8ed1cc240ac4693b61363104fd112286bde4460c13a8caabe236cc78dac5",
     "Characters/Seven/Evidence/Cheeks/max_expressions.txt": "00f8797a5f91e515ffa53ea2e41b186177e2cd89c72ae3896b85cc7cb231b499",
-    "Characters/Seven/Evidence/Cheeks/max_samples.json": "29c4dc99f3b1ef3042301cf0d915edd88edb677827be32fce87daedec9a24656",
     "Characters/Seven/Evidence/Cheeks/parameters.json": "49c10c31c041fb6bfb4a16715fab454be4018a12a296c0ec37d90d399fa43577",
-    "Characters/Seven/Evidence/Cheeks/previous_controls.json": "1a369196a5309918f0e667f12f44fdaed410f3843a5b28373765d660adf93613",
     "Characters/Seven/Evidence/Cheeks/reload_report.json": "364acfebfc58d9dd6006373cf821d0917c9209b21e4cf077228103ae54eda27b",
     "Characters/Seven/Evidence/Cheeks/validation.json": "3beaba099581fb73fbb5265a50dd2558efabb745545e3da398c26d3558a953a1",
     "Characters/Seven/Evidence/Chin/build_report.json": "f684c98f65816354e32dbefc4fa4a22388f477267e1e5670513e9ea74f7d5e06",
-    "Characters/Seven/Evidence/Chin/max_samples.json": "dcde30b6a33957cc06be2de0f66e0614dc356bc34364033c0e657854db69c42f",
     "Characters/Seven/Evidence/Chin/parameters.json": "0a9b10a042ad01b8814c363f63c22c73ee8dbfe264d99f962a18a75a9d00c41e",
-    "Characters/Seven/Evidence/Chin/previous_controls.json": "d7ae47305ee886e7ff34ebffb566db4e15c1b03c35dc03965009eefdbca60843",
     "Characters/Seven/Evidence/Chin/reload_report.json": "c92b89667fdb68c20acb8a93fb05fd1a49c90c7ee35f1d4cc10da60eb484f529",
     "Characters/Seven/Evidence/Chin/travel_adjustment.json": "5b1b8ce6957dae29a94951105775e99fcba6da44893aa76f4c8c96ee33a8d11f",
     "Characters/Seven/Evidence/Chin/validation.json": "6e77d3be22a7320b3f7bf31c264a85c81a3a0a32835f501d99cdba24b2a9bb57",
@@ -26,83 +22,63 @@
     "Characters/Seven/Evidence/DocumentationAudit/validation.json": "ea87f4ee92dee2148d6ceccc2367af5ea4fc44792b1a4532eb24658a8562c7ad",
     "Characters/Seven/Evidence/ExpressionSliders/build_report.json": "57a8b7f8e6f2359886544d75b15bbcd9dcd2f8d21d0e0915cb0d884c41c598b6",
     "Characters/Seven/Evidence/ExpressionSliders/layout_adjustment.json": "4dafbd5c17bed1c821649b9e36e06ff6bd45e79187b73fc4c48a35194b3ecff0",
-    "Characters/Seven/Evidence/ExpressionSliders/max_samples.json": "29c9fcc35ddb19f04102ef586e267a9180887d261754f96832c52d53cb941b0e",
     "Characters/Seven/Evidence/ExpressionSliders/parameters.json": "0bba677e2dba642e55dbc6b65385776af671b0dc08ad2144419fa596de1bf68f",
     "Characters/Seven/Evidence/ExpressionSliders/pose_adapter_disabled_probe.json": "71276b93fb9e0d09e5f4cd0594bbce7382dd50bcc03bf85af8233eecccd429c6",
     "Characters/Seven/Evidence/ExpressionSliders/preview_morph_check.json": "1b9716d451de24529b26ed1efa873cc4b65af11811159262a906d0202076580d",
-    "Characters/Seven/Evidence/ExpressionSliders/previous_controls.json": "9bcf1af24da5b8f58a4f02d6b4b6a985a04e3ea3fa51c774255941022e1f4208",
     "Characters/Seven/Evidence/ExpressionSliders/reload_report.json": "d7710922fbb76a736393777228d414323567e14c9466598bfa57a4a4c1eb502b",
     "Characters/Seven/Evidence/ExpressionSliders/validation.json": "24bbe7488aec6f20e7a09a508e39ff863d5431993f7c9a8493f4d3fdfd0ff556",
     "Characters/Seven/Evidence/Eyeballs/build_report.json": "69e4c1092da266542ceeae86d87f67b965fbd33ab51a19abf69f53286fe4d453",
-    "Characters/Seven/Evidence/Eyeballs/max_samples.json": "33fa340bb213bce6f4c6e074e5059bc11243c3510551eda540b265d57d840cba",
     "Characters/Seven/Evidence/Eyeballs/parameters.json": "d9178f755a6a6cc5484a5ca4f8347535ac8a87ee7318b6055521c054257b5e56",
-    "Characters/Seven/Evidence/Eyeballs/previous_controls.json": "2c388d93f82df28a59501e570675926b8a21bbd22edf83f0cafc1db8cf4ab71c",
     "Characters/Seven/Evidence/Eyeballs/reload_report.json": "827b9ad534d1bc3d811471b9fa85447a81f6dccf1179e45d759e6356e92314d7",
     "Characters/Seven/Evidence/Eyeballs/validation.json": "cbccccda14c6481a1ffd4f410de17ed0d0a04f17d6f8f7f1ff297b46e8326014",
     "Characters/Seven/Evidence/EyeExpressions/build_report.json": "98efba7dabc06c4c4ed48a634ba1be2d509bc2063207f9b4eea42ed94ec35435",
     "Characters/Seven/Evidence/EyeExpressions/layout_adjustment.json": "ca46f9a37a653ef2bda7fb3164ad21db53ec59a929a9b2b702c8f93c94fe82ca",
-    "Characters/Seven/Evidence/EyeExpressions/max_samples.json": "bc8e04cc5cb23c4bbce643316b9902b9e0deab9add51174623d91b56eace53e4",
     "Characters/Seven/Evidence/EyeExpressions/parameters.json": "a67d8b1bd543f50737062b0f58e208b4b67edc44591cc07c0092b98ea3dbb5db",
     "Characters/Seven/Evidence/EyeExpressions/preview_before_refresh.json": "d49d8e86da6f55c63855e460e50a673edea7f1d631df464376d79f997fab62b0",
     "Characters/Seven/Evidence/EyeExpressions/preview_morph_check.json": "a72439788d7056c7cbb3e72298cdf0853d08c1fd3c176d0f963ee53b4d1b91f2",
     "Characters/Seven/Evidence/EyeExpressions/preview_restored.json": "d266d25669448ec0fd64739d2afc8e4b3f6ae2b607a3feb80169d1191cbd50d6",
-    "Characters/Seven/Evidence/EyeExpressions/previous_controls.json": "cdb90dece7cbf1e06d7c43d84424c457f8b9afe18242ba159074e40f1991e60a",
     "Characters/Seven/Evidence/EyeExpressions/reload_report.json": "3c5cb3e8ed70f018b22e5df468f682cce450d8a4262686d68c8b95bbc89c9db0",
     "Characters/Seven/Evidence/EyeExpressions/source_validation.json": "b4a063106e051eb84ecaf333e0da7ed928801592bd725acf314ace2e7c34e49b",
     "Characters/Seven/Evidence/EyeExpressions/validation.json": "30f96016ac3756d3e538252881c30b65eb1e034ed6e19d17dcbb692992f24918",
     "Characters/Seven/Evidence/GazeMaster/build_report.json": "09a60b96dd9246f8c9da943411c15851c67e10dd8c1494ccd92b300a545ba67f",
     "Characters/Seven/Evidence/GazeMaster/initial_position_fix.json": "fcc69d4c0a7bde23e1be37c5be853890880a68a9fa615c82fe18c28289c27b2c",
-    "Characters/Seven/Evidence/GazeMaster/max_samples.json": "d4620dff6ffdfe695a450aca1e9461ac3db533c739805bee72a8dd34c38ccb35",
     "Characters/Seven/Evidence/GazeMaster/parameters.json": "55e3da79480feeac758777ff93f90bf2ecd6383f014a453dea38e69ab0e5e920",
-    "Characters/Seven/Evidence/GazeMaster/previous_controls.json": "11b684f77283c784309fd89b0812ad40b5b45ded362489ab8448ab5783dbd93e",
     "Characters/Seven/Evidence/GazeMaster/reload_report.json": "39e535435fe3c19a09c0cbc70cd614d14ab29d09b15f14ca14540bb136920133",
     "Characters/Seven/Evidence/GazeMaster/validation.json": "d5a7cc7a2afcfc194e56e58e917c4565bc0490954df4369b318921daffcaf5b7",
     "Characters/Seven/Evidence/LipControls/build_report.json": "e367873515b9f3ef07cf767a53466895c54cad8f5e4bb5e77e3c62d6c51a266b",
     "Characters/Seven/Evidence/LipControls/max_expressions.txt": "f87ee5f1c095c05df797d5d47c1d54cdd3f1bf5098a31e34be041ff09cbfcaa2",
-    "Characters/Seven/Evidence/LipControls/max_samples.json": "93129b4e3759b8e0acd232a0a1efdaa2c274697690bfcb99fbfd7e73d157b2c2",
     "Characters/Seven/Evidence/LipControls/parameters.json": "771469679bfc437bb5c4b216e0118503a0308eebfa121e5921f77d0435d8d980",
-    "Characters/Seven/Evidence/LipControls/previous_controls.json": "650e05f42d1dd051f11434703d17071ef05eb825db119e55216db1daaa893482",
     "Characters/Seven/Evidence/LipControls/reload_report.json": "c6038b2aaa63bf13725f5ab1a1f651deb4ca5ac19cce704a631ef3c9038ed1d6",
     "Characters/Seven/Evidence/LipControls/validation.json": "ff9351519a5e39af2b563c3a1051109a44d34738d6e2474c451e21b53a872812",
     "Characters/Seven/Evidence/MouthControls/build_report.json": "3ac9d2379263c9ff73bf326a38a6c4d3d75de3db4bf18f121767c378ec4d6ba0",
     "Characters/Seven/Evidence/MouthControls/max_expressions.txt": "595130ebdfc5ec9806d2e767790d674424e5ac62e67474e3a6049c62f49627c9",
-    "Characters/Seven/Evidence/MouthControls/max_samples.json": "2750f4dd9b14be7450710c932c68a507e07e1087df7d32cc454ecbefd0276e78",
     "Characters/Seven/Evidence/MouthControls/parameters.json": "278af71d352e672c4a401d9472d699c0c3f1760fdfc8dff30c225796d19f54f1",
-    "Characters/Seven/Evidence/MouthControls/previous_controls.json": "a19dab3cff3e324f69338ac1be52ca29e2029878c9fac2eb75255c1567d61607",
     "Characters/Seven/Evidence/MouthControls/reload_report.json": "bf942fca182eb676a750ae0e1b66e93f73c5e318aa2435a7ac4a99c867379d18",
     "Characters/Seven/Evidence/MouthControls/validation.json": "ca6a78b2b35e5ba4f7c3d6e3d64b99e94bf989ca505dabdde51f6a87cbd2cfca",
     "Characters/Seven/Evidence/Nose/build_report.json": "3424878616da246060862081d0e1b705b0a20d160fe42231b0c134ddb22a2665",
-    "Characters/Seven/Evidence/Nose/max_samples.json": "2bf21de7fab8fdded204da567b4c4295560d6faa26c74b2f46d67b6ba899cb7c",
     "Characters/Seven/Evidence/Nose/max_wires.txt": "7313beff3b615901ac49804caacffc31088c7acc20536b5915e3d69f3d137d12",
     "Characters/Seven/Evidence/Nose/parameters.json": "cd35b985369059089f2fd044828d9213b9c8569423c9e0575304f5d6bce02fbf",
-    "Characters/Seven/Evidence/Nose/previous_controls.json": "f4d881b911631a17e9bf0400233c593f412d6bf9942cffc5f09ca20e5ae46421",
     "Characters/Seven/Evidence/Nose/reload_report.json": "01651a19ce514235c26ffe7b1c09b8671e411e8d48d33f0480579404b41b79d6",
     "Characters/Seven/Evidence/Nose/validation.json": "3ac2f7c9efd6280e1a2f969a57dd38989274b637909073122b3ec15a13464012",
     "Characters/Seven/Evidence/NoseSides/build_report.json": "9dcdd7f7dc8cfb11ad917dffecbd0f420300ad07b80dc5be603aff9461926c75",
-    "Characters/Seven/Evidence/NoseSides/max_samples.json": "8b619de9e62b1c5f74bc824b53a905d3cae8d083d3075e31b70a2b15c3386286",
     "Characters/Seven/Evidence/NoseSides/parameters.json": "fa92634e2cc90cd92edc90031809e2d2eae37ee08ad2bbb17c7a9ab0cb771fab",
-    "Characters/Seven/Evidence/NoseSides/previous_controls.json": "26609b42de9ee2d69f95453bc9c69115dc2a85b070c738ae887402f1a49cd7ba",
     "Characters/Seven/Evidence/NoseSides/reload_report.json": "5b19d632a9fd1b4a530cf74e8c604e9a2f3d7e8f14e8f5c848d460ca78aca726",
     "Characters/Seven/Evidence/NoseSides/source_validation.json": "20d2b2f72a46738ac9185740e6ad5e7972c91fffe2c5760d808063f2f85c653e",
     "Characters/Seven/Evidence/NoseSides/validation.json": "fb34a8ba2040a13ba7a1dafe05e87908f0d35b3d003d9e7765ed47838bd54fdc",
-    "Characters/Seven/Evidence/PhonemeReference/before_outputs.json": "7aa82c95eab094e7df29ebe168fd52a392ca8ee504d83167df2d9a14e23eb208",
     "Characters/Seven/Evidence/PhonemeReference/build_report.json": "c33db515e34c57bbe24c33d557a74d769b416a80c890344fa2b631a75d5eafb1",
     "Characters/Seven/Evidence/PhonemeReference/depth_update.json": "fc5869ebefeb739fa469a608548a56d2698aa5bc2a7b43247b7d75a58108e239",
     "Characters/Seven/Evidence/PhonemeReference/parameters.json": "896c1799d3aaaedb464a61924f55ac6ee030851d90b5fe9549d39a2cf71148a4",
     "Characters/Seven/Evidence/PhonemeReference/preview_binding.json": "ff23f6c9795e11d4c570d25424d0c97c6f39d9faf9cd3584e2cd17fc9fffd988",
     "Characters/Seven/Evidence/PhonemeReference/validation.json": "0ffc160592f92c771a4e6af19e3799ce5af439690bc6d7bc0194470baed32803",
     "Characters/Seven/Evidence/PhonemeSliders/build_report.json": "343c46f43b96bed7eae14cc4108ffbc72314c3a7349f9f9adeae6d1b8d109dab",
-    "Characters/Seven/Evidence/PhonemeSliders/max_samples.json": "ab0bc0165fa681f4f9ce7c7767b77af3240d7a7785588e27affd8e865374d552",
     "Characters/Seven/Evidence/PhonemeSliders/parameters.json": "313f3554de18563e48d56f6ca26674a660722d28034ceebd95d8113ce8809e69",
     "Characters/Seven/Evidence/PhonemeSliders/preview_before_refresh.json": "16a54af6c367b844a213a28b4d97f4f507b8d04adf6342916471c7e4ec0a7130",
     "Characters/Seven/Evidence/PhonemeSliders/preview_morph_check.json": "7d888c4ed125f56f713151b094a13bfd65c2c5e982640cf9fa01898e640d3ff2",
-    "Characters/Seven/Evidence/PhonemeSliders/previous_controls.json": "d4a43d988765525b4801afa364385af0b2e92de8afc9ae058492e6088fdf7e7f",
     "Characters/Seven/Evidence/PhonemeSliders/reload_report.json": "b9fede569f34a7abbeb00d7f6198a7d9df91348190e16f51471037feae04e2f0",
     "Characters/Seven/Evidence/PhonemeSliders/validation.json": "b2cccc97bb2d6b8f6d74a7cf19a9f16cf76b7f649ce825439b6f1ef9a268ea25",
     "Characters/Seven/Evidence/SevenRuntime/build_report.json": "c967394f4ffe56fa06a3bc85a170a7d637962c1047aa6ef9575b627c2ce1a230",
     "Characters/Seven/Evidence/SevenRuntime/delivery_check.json": "d3b132501cf87beeb9ee4ce9b05bd1a55996ac92104e672dadd30c480a73a817",
     "Characters/Seven/Evidence/SevenRuntime/documentation_validation.json": "445eb464d8da3f0c62bd1ff7aebd259063275ad8e8b6906b4753175c8d10bb6b",
-    "Characters/Seven/Evidence/SevenRuntime/graph_export.txt": "e7c3212012a35a2d98a47a05086f74721439172806890cbd283e50bda3673188",
     "Characters/Seven/Evidence/SevenRuntime/preview_before_refresh.json": "112be910eb6b09f425fbb0cd82f54f8132f04fe196084253e9becd0d07637433",
     "Characters/Seven/Evidence/SevenRuntime/preview_controls_validation.json": "42b3f81a5aa212f043fd1e3391cb00b943ce42ff7f50f6ffef45c78a5be47d9f",
     "Characters/Seven/Evidence/SevenRuntime/preview_first_attempt.json": "7a1f92ef24bcabc6bb26719cfb855090dcf15b32559afc143995854c8d04174f",
@@ -117,7 +93,6 @@
     "Characters/Seven/Evidence/SYP_R001/lid_spin_fix_validation.json": "7bd1fd6c0a8fa0b656705b2ed646b8038193d70e3bece88d76135dad0ad0b24a",
     "Characters/Seven/Evidence/SYP_R001/lid_weight_comparison.json": "982d4401331ea5ffcbe7a08e17b77e3fbc4923365f3c83df369f7c5fb9672ad2",
     "Characters/Seven/Evidence/XYP/build_report.json": "2f0e3445b610f62c01dc2e7d37b03433fe14e3b69815e18392f062a2c08aa829",
-    "Characters/Seven/Evidence/XYP/max_samples.json": "60db4bc975a6357b4cb507eaedd8aab24c1a112b27a379665779871ce9a21ac4",
     "Characters/Seven/Evidence/XYP/parameters.json": "6e47ebcfd5bc998618fb3447f3400259c012f3473de005e8711a2378447a6c31",
     "Characters/Seven/Evidence/XYP/reload.json": "6c80aadc227f6cb55046c66e01798da418a69a0b2214e9ec4b564bf655e4a20b",
     "Characters/Seven/Evidence/XYP/validation.json": "75b3f4db2037b74d63bc0482757e2d72ab91f521aedd5c57645f37b1568f1826",
@@ -199,64 +174,342 @@
     "Characters/Seven/Evidence/SevenRuntime/after_reload/verify_phoneme_sliders/console.txt": "dabb2580e6f42e3b536a384e80d4e8016e926b9177b72822282c9dd6f3deb063",
     "Characters/Seven/Evidence/SevenRuntime/after_reload/verify_phoneme_sliders/result.json": "2861e3aa1d0fffaebf4e2fc47c34e6943aa85679389b5f0ee308fc47df8a6d1e",
     "Characters/Seven/Evidence/SevenRuntime/after_reload/verify_phoneme_sliders/validation.json": "4f843c99c15aa3212a360e9b3bf7eb73fcf0b87d020e54a8f0563cbfff9f290a",
-    "Characters/Seven/Evidence/CR58/Brows/build_report.json": "dddc000ae0e229816c9d1f1fe1ca37274a1073f0e1d79eeffeb390dd5d2e2eea",
-    "Characters/Seven/Evidence/CR58/Brows/points_build_report.json": "608f7f4e6c80a53c5dfb77c8c0ebed60e7b429510e25cce670c0529c0957609f",
-    "Characters/Seven/Evidence/CR58/Cheeks/max_samples.json": "29c4dc99f3b1ef3042301cf0d915edd88edb677827be32fce87daedec9a24656",
-    "Characters/Seven/Evidence/CR58/Cheeks/parameters.json": "49c10c31c041fb6bfb4a16715fab454be4018a12a296c0ec37d90d399fa43577",
-    "Characters/Seven/Evidence/CR58/Cheeks/replay_build_cheek_controls.py": "5f2d41354c81472674bd3494ebe6a15fc4621cd40e6e35b07efd68844061b9d0",
-    "Characters/Seven/Evidence/CR58/Chin/max_samples.json": "dcde30b6a33957cc06be2de0f66e0614dc356bc34364033c0e657854db69c42f",
-    "Characters/Seven/Evidence/CR58/Chin/parameters.json": "0a9b10a042ad01b8814c363f63c22c73ee8dbfe264d99f962a18a75a9d00c41e",
-    "Characters/Seven/Evidence/CR58/Chin/replay_build_chin_control.py": "6560729900a7529876702346142239cd1a72cca98764bb8f3a02a92fecd927b0",
-    "Characters/Seven/Evidence/CR58/ExpressionSliders/max_samples.json": "29c9fcc35ddb19f04102ef586e267a9180887d261754f96832c52d53cb941b0e",
-    "Characters/Seven/Evidence/CR58/ExpressionSliders/parameters.json": "0bba677e2dba642e55dbc6b65385776af671b0dc08ad2144419fa596de1bf68f",
-    "Characters/Seven/Evidence/CR58/ExpressionSliders/replay_build_expression_sliders.py": "3b55790e8ea6f162d37ed1d3f2074fa402d339a62569974119863ce331976d13",
-    "Characters/Seven/Evidence/CR58/Eyeballs/max_samples.json": "33fa340bb213bce6f4c6e074e5059bc11243c3510551eda540b265d57d840cba",
-    "Characters/Seven/Evidence/CR58/Eyeballs/parameters.json": "d9178f755a6a6cc5484a5ca4f8347535ac8a87ee7318b6055521c054257b5e56",
-    "Characters/Seven/Evidence/CR58/Eyeballs/replay_build_eyeball_controls.py": "2571f77882549f071ae77a3699efb586ce1f34c56c434cf166e1d042430ddca1",
-    "Characters/Seven/Evidence/CR58/EyeExpressions/max_samples.json": "bc8e04cc5cb23c4bbce643316b9902b9e0deab9add51174623d91b56eace53e4",
-    "Characters/Seven/Evidence/CR58/EyeExpressions/parameters.json": "a67d8b1bd543f50737062b0f58e208b4b67edc44591cc07c0092b98ea3dbb5db",
-    "Characters/Seven/Evidence/CR58/EyeExpressions/replay_build_eye_expression_sliders.py": "eefe66b4d1a61c4513ab0c3d508827e760246937b2a7b1bcacbd136a055f2bab",
-    "Characters/Seven/Evidence/CR58/EyeLidArc/replay_build_eye_lid_arc.py": "c3155613d348d43ee3da89f36cc837bba8a8f70805f74bb8cbb35aa62f1d3939",
-    "Characters/Seven/Evidence/CR58/EyePoints/replay_build_eye_points.py": "4a5d699083c51afa471afb1ea74aee5c7b350322e1e762c96c578947e538ba9f",
-    "Characters/Seven/Evidence/CR58/GazeMaster/max_samples.json": "d4620dff6ffdfe695a450aca1e9461ac3db533c739805bee72a8dd34c38ccb35",
-    "Characters/Seven/Evidence/CR58/GazeMaster/parameters.json": "55e3da79480feeac758777ff93f90bf2ecd6383f014a453dea38e69ab0e5e920",
-    "Characters/Seven/Evidence/CR58/GazeMaster/replay_build_gaze_master.py": "f790caf6bf7527059f77a4f73539bf3443298938db9352d934107cbc5f2eb5d7",
-    "Characters/Seven/Evidence/CR58/Lip/build_report.json": "737dc76cfcff4d78336d308ac9bf7769f10e19f90254e3da358db4786718148a",
-    "Characters/Seven/Evidence/CR58/Lip/max_samples.json": "93129b4e3759b8e0acd232a0a1efdaa2c274697690bfcb99fbfd7e73d157b2c2",
-    "Characters/Seven/Evidence/CR58/Lip/parameters.json": "771469679bfc437bb5c4b216e0118503a0308eebfa121e5921f77d0435d8d980",
-    "Characters/Seven/Evidence/CR58/Lip/previous_controls.json": "0e267cb00d685e81427ea6cc1e8bf18b6c0d2fc3f35d4e4ff1444223a8e604af",
-    "Characters/Seven/Evidence/CR58/Lip/replay_build_lip_controls.py": "6a856459976dc6ebdbe1e18bd48099e7ace62d7cc5565683f772d014e8506841",
-    "Characters/Seven/Evidence/CR58/Lip/replay_verify_lip_controls.py": "ec47e6fc1cb32876c423631bf11e6e9c5cc1f8c32ca856d93f5d9ab512309738",
-    "Characters/Seven/Evidence/CR58/Mouth/max_samples.json": "2750f4dd9b14be7450710c932c68a507e07e1087df7d32cc454ecbefd0276e78",
-    "Characters/Seven/Evidence/CR58/Mouth/parameters.json": "278af71d352e672c4a401d9472d699c0c3f1760fdfc8dff30c225796d19f54f1",
-    "Characters/Seven/Evidence/CR58/Mouth/replay_build_mouth_controls.py": "269147d58d60aae4fb0ae2d85e5b62b47afbf19b26fd69fb296ac394a8c6367e",
-    "Characters/Seven/Evidence/CR58/Nose/max_samples.json": "2bf21de7fab8fdded204da567b4c4295560d6faa26c74b2f46d67b6ba899cb7c",
-    "Characters/Seven/Evidence/CR58/Nose/parameters.json": "cd35b985369059089f2fd044828d9213b9c8569423c9e0575304f5d6bce02fbf",
-    "Characters/Seven/Evidence/CR58/Nose/replay_build_nose_controls.py": "bcf883b469bbdb0bc156ffbcc92ad08f8404119fd26312ad5fbc46893fd5f948",
-    "Characters/Seven/Evidence/CR58/NoseSides/max_samples.json": "8b619de9e62b1c5f74bc824b53a905d3cae8d083d3075e31b70a2b15c3386286",
-    "Characters/Seven/Evidence/CR58/NoseSides/parameters.json": "fa92634e2cc90cd92edc90031809e2d2eae37ee08ad2bbb17c7a9ab0cb771fab",
-    "Characters/Seven/Evidence/CR58/NoseSides/replay_build_nose_side_controls.py": "1b64da55abf6da3a2bd33a6ba6d586f6925a1a8fcaf5673c32e6feeedb967e5b",
-    "Characters/Seven/Evidence/CR58/PhonemeReference/before_outputs.json": "8c25e512218d1dff2ed922876abb993ec641f82cfde0def06024dc420694226e",
-    "Characters/Seven/Evidence/CR58/PhonemeReference/build_report.json": "fa84b7f93d975698a589896dbc14e56fa41cd549c5b2d9b8b9178b69e07f083a",
-    "Characters/Seven/Evidence/CR58/PhonemeReference/depth_update.json": "fc5869ebefeb739fa469a608548a56d2698aa5bc2a7b43247b7d75a58108e239",
-    "Characters/Seven/Evidence/CR58/PhonemeReference/parameters.json": "896c1799d3aaaedb464a61924f55ac6ee030851d90b5fe9549d39a2cf71148a4",
-    "Characters/Seven/Evidence/CR58/PhonemeReference/preview_binding.json": "ff23f6c9795e11d4c570d25424d0c97c6f39d9faf9cd3584e2cd17fc9fffd988",
-    "Characters/Seven/Evidence/CR58/PhonemeReference/replay_build_phoneme_reference.py": "6477079c69c4e32916c1e02fc764c8de75ac2cdd5b5e164cfd6f55a32a6bb463",
-    "Characters/Seven/Evidence/CR58/PhonemeReference/validation.json": "0ffc160592f92c771a4e6af19e3799ce5af439690bc6d7bc0194470baed32803",
-    "Characters/Seven/Evidence/CR58/PhonemeSliders/max_samples.json": "ab0bc0165fa681f4f9ce7c7767b77af3240d7a7785588e27affd8e865374d552",
-    "Characters/Seven/Evidence/CR58/PhonemeSliders/parameters.json": "313f3554de18563e48d56f6ca26674a660722d28034ceebd95d8113ce8809e69",
-    "Characters/Seven/Evidence/CR58/PhonemeSliders/replay_build_phoneme_sliders.py": "cb010b18223d145c6e2998694e2d2f997bb2a6b8bbce8952ec4f570402cdc0b9",
-    "Characters/Seven/Evidence/CR58/XYP/build_report.json": "6e37233638a52332877e3ef0e848704777eab4f3c6ddc3bc66c9422eb7865cd3",
-    "Characters/Seven/Evidence/CR58/XYP/max_samples.json": "60db4bc975a6357b4cb507eaedd8aab24c1a112b27a379665779871ce9a21ac4",
-    "Characters/Seven/Evidence/CR58/XYP/parameters.json": "6e47ebcfd5bc998618fb3447f3400259c012f3473de005e8711a2378447a6c31",
-    "Characters/Seven/Evidence/CR58/XYP/replay_build_lower_lids.py": "f59d3294ce3eab8d346ae528903a3323dcc89da50f2c7bb54375473c701e7119",
-    "Characters/Seven/Evidence/CR58/Brows/BendL/replay_build_brow_bend_left.py": "29f8552766b35d241c33303586fdf1832c0b467e178e488b4f0cd76b3411b2e9",
-    "Characters/Seven/Evidence/CR58/Brows/BendR/replay_build_brow_bend.py": "a7b8da093658f49bc614d7e9e665046510d8c2b9010656dda57280411951e8ae",
-    "Characters/Seven/Evidence/CR58/Brows/Points/replay_build_brow_points.py": "49371c489a061b6770bf151d688c9b4d2856499542ddbcf306e0412927ff8e66",
-    "Characters/Seven/Evidence/CR58/Brows/Whole/replay_build_brow_two.py": "35adde446a937da9f6d4870c90bb58268b55ab8e8157a681fa86b9ae9b238f1c",
     "ProjectNotes/Evidence/docs_audit_2026-11-06.json": "a867112b1e05ef73f935496a97d4cc5bc6aaf870fa79312aaf6e14511359e38e",
     "ProjectNotes/LipSync/Images/lipsync_mouth_before_after.png": "9a59ef27fa3ec5d65b7870d082c3351a9201e1094a6d4bc4c384b8bb25575236",
     "ProjectNotes/LipSync/Images/lipsync_open_close_frames.png": "ea9010ecbe1c7e000ed77c4cd5782eb6f911549d316138dfdc511d71ae0456df"
   },
-  "original_files": 730
+  "original_files": 257,
+  "moved_out": {
+    "note": "Bulk role evidence moved to the target project on 2026-11-10; read_path prefers the project copy and falls back to the package only if present.",
+    "files": {
+      "Characters/Seven/Evidence/Cheeks/max_samples.json": {
+        "sha256": "29c4dc99f3b1ef3042301cf0d915edd88edb677827be32fce87daedec9a24656",
+        "moved_to": "Saved/FaceMigration/Characters/Seven/Cheeks/max_samples.json"
+      },
+      "Characters/Seven/Evidence/Cheeks/previous_controls.json": {
+        "sha256": "1a369196a5309918f0e667f12f44fdaed410f3843a5b28373765d660adf93613",
+        "moved_to": "Saved/FaceMigration/Characters/Seven/Cheeks/previous_controls.json"
+      },
+      "Characters/Seven/Evidence/Chin/max_samples.json": {
+        "sha256": "dcde30b6a33957cc06be2de0f66e0614dc356bc34364033c0e657854db69c42f",
+        "moved_to": "Saved/FaceMigration/Characters/Seven/Chin/max_samples.json"
+      },
+      "Characters/Seven/Evidence/Chin/previous_controls.json": {
+        "sha256": "d7ae47305ee886e7ff34ebffb566db4e15c1b03c35dc03965009eefdbca60843",
+        "moved_to": "Saved/FaceMigration/Characters/Seven/Chin/previous_controls.json"
+      },
+      "Characters/Seven/Evidence/CR58/Brows/BendL/replay_build_brow_bend_left.py": {
+        "sha256": "29f8552766b35d241c33303586fdf1832c0b467e178e488b4f0cd76b3411b2e9",
+        "moved_to": "Saved/FaceMigration/Imported/CR58/Brows/BendL/replay_build_brow_bend_left.py"
+      },
+      "Characters/Seven/Evidence/CR58/Brows/BendR/replay_build_brow_bend.py": {
+        "sha256": "a7b8da093658f49bc614d7e9e665046510d8c2b9010656dda57280411951e8ae",
+        "moved_to": "Saved/FaceMigration/Imported/CR58/Brows/BendR/replay_build_brow_bend.py"
+      },
+      "Characters/Seven/Evidence/CR58/Brows/build_report.json": {
+        "sha256": "dddc000ae0e229816c9d1f1fe1ca37274a1073f0e1d79eeffeb390dd5d2e2eea",
+        "moved_to": "Saved/FaceMigration/Imported/CR58/Brows/build_report.json"
+      },
+      "Characters/Seven/Evidence/CR58/Brows/Points/replay_build_brow_points.py": {
+        "sha256": "49371c489a061b6770bf151d688c9b4d2856499542ddbcf306e0412927ff8e66",
+        "moved_to": "Saved/FaceMigration/Imported/CR58/Brows/Points/replay_build_brow_points.py"
+      },
+      "Characters/Seven/Evidence/CR58/Brows/points_build_report.json": {
+        "sha256": "608f7f4e6c80a53c5dfb77c8c0ebed60e7b429510e25cce670c0529c0957609f",
+        "moved_to": "Saved/FaceMigration/Imported/CR58/Brows/points_build_report.json"
+      },
+      "Characters/Seven/Evidence/CR58/Brows/Whole/replay_build_brow_two.py": {
+        "sha256": "35adde446a937da9f6d4870c90bb58268b55ab8e8157a681fa86b9ae9b238f1c",
+        "moved_to": "Saved/FaceMigration/Imported/CR58/Brows/Whole/replay_build_brow_two.py"
+      },
+      "Characters/Seven/Evidence/CR58/Cheeks/max_samples.json": {
+        "sha256": "29c4dc99f3b1ef3042301cf0d915edd88edb677827be32fce87daedec9a24656",
+        "moved_to": "Saved/FaceMigration/Imported/CR58/Cheeks/max_samples.json"
+      },
+      "Characters/Seven/Evidence/CR58/Cheeks/parameters.json": {
+        "sha256": "49c10c31c041fb6bfb4a16715fab454be4018a12a296c0ec37d90d399fa43577",
+        "moved_to": "Saved/FaceMigration/Imported/CR58/Cheeks/parameters.json"
+      },
+      "Characters/Seven/Evidence/CR58/Cheeks/replay_build_cheek_controls.py": {
+        "sha256": "5f2d41354c81472674bd3494ebe6a15fc4621cd40e6e35b07efd68844061b9d0",
+        "moved_to": "Saved/FaceMigration/Imported/CR58/Cheeks/replay_build_cheek_controls.py"
+      },
+      "Characters/Seven/Evidence/CR58/Chin/max_samples.json": {
+        "sha256": "dcde30b6a33957cc06be2de0f66e0614dc356bc34364033c0e657854db69c42f",
+        "moved_to": "Saved/FaceMigration/Imported/CR58/Chin/max_samples.json"
+      },
+      "Characters/Seven/Evidence/CR58/Chin/parameters.json": {
+        "sha256": "0a9b10a042ad01b8814c363f63c22c73ee8dbfe264d99f962a18a75a9d00c41e",
+        "moved_to": "Saved/FaceMigration/Imported/CR58/Chin/parameters.json"
+      },
+      "Characters/Seven/Evidence/CR58/Chin/replay_build_chin_control.py": {
+        "sha256": "6560729900a7529876702346142239cd1a72cca98764bb8f3a02a92fecd927b0",
+        "moved_to": "Saved/FaceMigration/Imported/CR58/Chin/replay_build_chin_control.py"
+      },
+      "Characters/Seven/Evidence/CR58/ExpressionSliders/max_samples.json": {
+        "sha256": "29c9fcc35ddb19f04102ef586e267a9180887d261754f96832c52d53cb941b0e",
+        "moved_to": "Saved/FaceMigration/Imported/CR58/ExpressionSliders/max_samples.json"
+      },
+      "Characters/Seven/Evidence/CR58/ExpressionSliders/parameters.json": {
+        "sha256": "0bba677e2dba642e55dbc6b65385776af671b0dc08ad2144419fa596de1bf68f",
+        "moved_to": "Saved/FaceMigration/Imported/CR58/ExpressionSliders/parameters.json"
+      },
+      "Characters/Seven/Evidence/CR58/ExpressionSliders/replay_build_expression_sliders.py": {
+        "sha256": "3b55790e8ea6f162d37ed1d3f2074fa402d339a62569974119863ce331976d13",
+        "moved_to": "Saved/FaceMigration/Imported/CR58/ExpressionSliders/replay_build_expression_sliders.py"
+      },
+      "Characters/Seven/Evidence/CR58/Eyeballs/max_samples.json": {
+        "sha256": "33fa340bb213bce6f4c6e074e5059bc11243c3510551eda540b265d57d840cba",
+        "moved_to": "Saved/FaceMigration/Imported/CR58/Eyeballs/max_samples.json"
+      },
+      "Characters/Seven/Evidence/CR58/Eyeballs/parameters.json": {
+        "sha256": "d9178f755a6a6cc5484a5ca4f8347535ac8a87ee7318b6055521c054257b5e56",
+        "moved_to": "Saved/FaceMigration/Imported/CR58/Eyeballs/parameters.json"
+      },
+      "Characters/Seven/Evidence/CR58/Eyeballs/replay_build_eyeball_controls.py": {
+        "sha256": "2571f77882549f071ae77a3699efb586ce1f34c56c434cf166e1d042430ddca1",
+        "moved_to": "Saved/FaceMigration/Imported/CR58/Eyeballs/replay_build_eyeball_controls.py"
+      },
+      "Characters/Seven/Evidence/CR58/EyeExpressions/max_samples.json": {
+        "sha256": "bc8e04cc5cb23c4bbce643316b9902b9e0deab9add51174623d91b56eace53e4",
+        "moved_to": "Saved/FaceMigration/Imported/CR58/EyeExpressions/max_samples.json"
+      },
+      "Characters/Seven/Evidence/CR58/EyeExpressions/parameters.json": {
+        "sha256": "a67d8b1bd543f50737062b0f58e208b4b67edc44591cc07c0092b98ea3dbb5db",
+        "moved_to": "Saved/FaceMigration/Imported/CR58/EyeExpressions/parameters.json"
+      },
+      "Characters/Seven/Evidence/CR58/EyeExpressions/replay_build_eye_expression_sliders.py": {
+        "sha256": "eefe66b4d1a61c4513ab0c3d508827e760246937b2a7b1bcacbd136a055f2bab",
+        "moved_to": "Saved/FaceMigration/Imported/CR58/EyeExpressions/replay_build_eye_expression_sliders.py"
+      },
+      "Characters/Seven/Evidence/CR58/EyeLidArc/replay_build_eye_lid_arc.py": {
+        "sha256": "c3155613d348d43ee3da89f36cc837bba8a8f70805f74bb8cbb35aa62f1d3939",
+        "moved_to": "Saved/FaceMigration/Imported/CR58/EyeLidArc/replay_build_eye_lid_arc.py"
+      },
+      "Characters/Seven/Evidence/CR58/EyePoints/replay_build_eye_points.py": {
+        "sha256": "4a5d699083c51afa471afb1ea74aee5c7b350322e1e762c96c578947e538ba9f",
+        "moved_to": "Saved/FaceMigration/Imported/CR58/EyePoints/replay_build_eye_points.py"
+      },
+      "Characters/Seven/Evidence/CR58/GazeMaster/max_samples.json": {
+        "sha256": "d4620dff6ffdfe695a450aca1e9461ac3db533c739805bee72a8dd34c38ccb35",
+        "moved_to": "Saved/FaceMigration/Imported/CR58/GazeMaster/max_samples.json"
+      },
+      "Characters/Seven/Evidence/CR58/GazeMaster/parameters.json": {
+        "sha256": "55e3da79480feeac758777ff93f90bf2ecd6383f014a453dea38e69ab0e5e920",
+        "moved_to": "Saved/FaceMigration/Imported/CR58/GazeMaster/parameters.json"
+      },
+      "Characters/Seven/Evidence/CR58/GazeMaster/replay_build_gaze_master.py": {
+        "sha256": "f790caf6bf7527059f77a4f73539bf3443298938db9352d934107cbc5f2eb5d7",
+        "moved_to": "Saved/FaceMigration/Imported/CR58/GazeMaster/replay_build_gaze_master.py"
+      },
+      "Characters/Seven/Evidence/CR58/Lip/build_report.json": {
+        "sha256": "737dc76cfcff4d78336d308ac9bf7769f10e19f90254e3da358db4786718148a",
+        "moved_to": "Saved/FaceMigration/Imported/CR58/Lip/build_report.json"
+      },
+      "Characters/Seven/Evidence/CR58/Lip/max_samples.json": {
+        "sha256": "93129b4e3759b8e0acd232a0a1efdaa2c274697690bfcb99fbfd7e73d157b2c2",
+        "moved_to": "Saved/FaceMigration/Imported/CR58/Lip/max_samples.json"
+      },
+      "Characters/Seven/Evidence/CR58/Lip/parameters.json": {
+        "sha256": "771469679bfc437bb5c4b216e0118503a0308eebfa121e5921f77d0435d8d980",
+        "moved_to": "Saved/FaceMigration/Imported/CR58/Lip/parameters.json"
+      },
+      "Characters/Seven/Evidence/CR58/Lip/previous_controls.json": {
+        "sha256": "0e267cb00d685e81427ea6cc1e8bf18b6c0d2fc3f35d4e4ff1444223a8e604af",
+        "moved_to": "Saved/FaceMigration/Imported/CR58/Lip/previous_controls.json"
+      },
+      "Characters/Seven/Evidence/CR58/Lip/replay_build_lip_controls.py": {
+        "sha256": "6a856459976dc6ebdbe1e18bd48099e7ace62d7cc5565683f772d014e8506841",
+        "moved_to": "Saved/FaceMigration/Imported/CR58/Lip/replay_build_lip_controls.py"
+      },
+      "Characters/Seven/Evidence/CR58/Lip/replay_verify_lip_controls.py": {
+        "sha256": "ec47e6fc1cb32876c423631bf11e6e9c5cc1f8c32ca856d93f5d9ab512309738",
+        "moved_to": "Saved/FaceMigration/Imported/CR58/Lip/replay_verify_lip_controls.py"
+      },
+      "Characters/Seven/Evidence/CR58/Mouth/max_samples.json": {
+        "sha256": "2750f4dd9b14be7450710c932c68a507e07e1087df7d32cc454ecbefd0276e78",
+        "moved_to": "Saved/FaceMigration/Imported/CR58/Mouth/max_samples.json"
+      },
+      "Characters/Seven/Evidence/CR58/Mouth/parameters.json": {
+        "sha256": "278af71d352e672c4a401d9472d699c0c3f1760fdfc8dff30c225796d19f54f1",
+        "moved_to": "Saved/FaceMigration/Imported/CR58/Mouth/parameters.json"
+      },
+      "Characters/Seven/Evidence/CR58/Mouth/replay_build_mouth_controls.py": {
+        "sha256": "269147d58d60aae4fb0ae2d85e5b62b47afbf19b26fd69fb296ac394a8c6367e",
+        "moved_to": "Saved/FaceMigration/Imported/CR58/Mouth/replay_build_mouth_controls.py"
+      },
+      "Characters/Seven/Evidence/CR58/Nose/max_samples.json": {
+        "sha256": "2bf21de7fab8fdded204da567b4c4295560d6faa26c74b2f46d67b6ba899cb7c",
+        "moved_to": "Saved/FaceMigration/Imported/CR58/Nose/max_samples.json"
+      },
+      "Characters/Seven/Evidence/CR58/Nose/parameters.json": {
+        "sha256": "cd35b985369059089f2fd044828d9213b9c8569423c9e0575304f5d6bce02fbf",
+        "moved_to": "Saved/FaceMigration/Imported/CR58/Nose/parameters.json"
+      },
+      "Characters/Seven/Evidence/CR58/Nose/replay_build_nose_controls.py": {
+        "sha256": "bcf883b469bbdb0bc156ffbcc92ad08f8404119fd26312ad5fbc46893fd5f948",
+        "moved_to": "Saved/FaceMigration/Imported/CR58/Nose/replay_build_nose_controls.py"
+      },
+      "Characters/Seven/Evidence/CR58/NoseSides/max_samples.json": {
+        "sha256": "8b619de9e62b1c5f74bc824b53a905d3cae8d083d3075e31b70a2b15c3386286",
+        "moved_to": "Saved/FaceMigration/Imported/CR58/NoseSides/max_samples.json"
+      },
+      "Characters/Seven/Evidence/CR58/NoseSides/parameters.json": {
+        "sha256": "fa92634e2cc90cd92edc90031809e2d2eae37ee08ad2bbb17c7a9ab0cb771fab",
+        "moved_to": "Saved/FaceMigration/Imported/CR58/NoseSides/parameters.json"
+      },
+      "Characters/Seven/Evidence/CR58/NoseSides/replay_build_nose_side_controls.py": {
+        "sha256": "1b64da55abf6da3a2bd33a6ba6d586f6925a1a8fcaf5673c32e6feeedb967e5b",
+        "moved_to": "Saved/FaceMigration/Imported/CR58/NoseSides/replay_build_nose_side_controls.py"
+      },
+      "Characters/Seven/Evidence/CR58/PhonemeReference/before_outputs.json": {
+        "sha256": "8c25e512218d1dff2ed922876abb993ec641f82cfde0def06024dc420694226e",
+        "moved_to": "Saved/FaceMigration/Imported/CR58/PhonemeReference/before_outputs.json"
+      },
+      "Characters/Seven/Evidence/CR58/PhonemeReference/build_report.json": {
+        "sha256": "fa84b7f93d975698a589896dbc14e56fa41cd549c5b2d9b8b9178b69e07f083a",
+        "moved_to": "Saved/FaceMigration/Imported/CR58/PhonemeReference/build_report.json"
+      },
+      "Characters/Seven/Evidence/CR58/PhonemeReference/depth_update.json": {
+        "sha256": "fc5869ebefeb739fa469a608548a56d2698aa5bc2a7b43247b7d75a58108e239",
+        "moved_to": "Saved/FaceMigration/Imported/CR58/PhonemeReference/depth_update.json"
+      },
+      "Characters/Seven/Evidence/CR58/PhonemeReference/parameters.json": {
+        "sha256": "896c1799d3aaaedb464a61924f55ac6ee030851d90b5fe9549d39a2cf71148a4",
+        "moved_to": "Saved/FaceMigration/Imported/CR58/PhonemeReference/parameters.json"
+      },
+      "Characters/Seven/Evidence/CR58/PhonemeReference/preview_binding.json": {
+        "sha256": "ff23f6c9795e11d4c570d25424d0c97c6f39d9faf9cd3584e2cd17fc9fffd988",
+        "moved_to": "Saved/FaceMigration/Imported/CR58/PhonemeReference/preview_binding.json"
+      },
+      "Characters/Seven/Evidence/CR58/PhonemeReference/README.md": {
+        "sha256": "054df3642981394c2f75248192c6b88b09c73f01deddb4d1e9e664b2841c869a",
+        "moved_to": "Saved/FaceMigration/Imported/CR58/PhonemeReference/README.md"
+      },
+      "Characters/Seven/Evidence/CR58/PhonemeReference/replay_build_phoneme_reference.py": {
+        "sha256": "6477079c69c4e32916c1e02fc764c8de75ac2cdd5b5e164cfd6f55a32a6bb463",
+        "moved_to": "Saved/FaceMigration/Imported/CR58/PhonemeReference/replay_build_phoneme_reference.py"
+      },
+      "Characters/Seven/Evidence/CR58/PhonemeReference/validation.json": {
+        "sha256": "0ffc160592f92c771a4e6af19e3799ce5af439690bc6d7bc0194470baed32803",
+        "moved_to": "Saved/FaceMigration/Imported/CR58/PhonemeReference/validation.json"
+      },
+      "Characters/Seven/Evidence/CR58/PhonemeSliders/max_samples.json": {
+        "sha256": "ab0bc0165fa681f4f9ce7c7767b77af3240d7a7785588e27affd8e865374d552",
+        "moved_to": "Saved/FaceMigration/Imported/CR58/PhonemeSliders/max_samples.json"
+      },
+      "Characters/Seven/Evidence/CR58/PhonemeSliders/parameters.json": {
+        "sha256": "313f3554de18563e48d56f6ca26674a660722d28034ceebd95d8113ce8809e69",
+        "moved_to": "Saved/FaceMigration/Imported/CR58/PhonemeSliders/parameters.json"
+      },
+      "Characters/Seven/Evidence/CR58/PhonemeSliders/replay_build_phoneme_sliders.py": {
+        "sha256": "cb010b18223d145c6e2998694e2d2f997bb2a6b8bbce8952ec4f570402cdc0b9",
+        "moved_to": "Saved/FaceMigration/Imported/CR58/PhonemeSliders/replay_build_phoneme_sliders.py"
+      },
+      "Characters/Seven/Evidence/CR58/README.md": {
+        "sha256": "0474fa92d9dc99fb7620ad075a2e3a194088def0cee08c6a06d8ba8296daff73",
+        "moved_to": "Saved/FaceMigration/Imported/CR58/README.md"
+      },
+      "Characters/Seven/Evidence/CR58/XYP/build_report.json": {
+        "sha256": "6e37233638a52332877e3ef0e848704777eab4f3c6ddc3bc66c9422eb7865cd3",
+        "moved_to": "Saved/FaceMigration/Imported/CR58/XYP/build_report.json"
+      },
+      "Characters/Seven/Evidence/CR58/XYP/max_samples.json": {
+        "sha256": "60db4bc975a6357b4cb507eaedd8aab24c1a112b27a379665779871ce9a21ac4",
+        "moved_to": "Saved/FaceMigration/Imported/CR58/XYP/max_samples.json"
+      },
+      "Characters/Seven/Evidence/CR58/XYP/parameters.json": {
+        "sha256": "6e47ebcfd5bc998618fb3447f3400259c012f3473de005e8711a2378447a6c31",
+        "moved_to": "Saved/FaceMigration/Imported/CR58/XYP/parameters.json"
+      },
+      "Characters/Seven/Evidence/CR58/XYP/replay_build_lower_lids.py": {
+        "sha256": "f59d3294ce3eab8d346ae528903a3323dcc89da50f2c7bb54375473c701e7119",
+        "moved_to": "Saved/FaceMigration/Imported/CR58/XYP/replay_build_lower_lids.py"
+      },
+      "Characters/Seven/Evidence/ExpressionSliders/max_samples.json": {
+        "sha256": "29c9fcc35ddb19f04102ef586e267a9180887d261754f96832c52d53cb941b0e",
+        "moved_to": "Saved/FaceMigration/Characters/Seven/ExpressionSliders/max_samples.json"
+      },
+      "Characters/Seven/Evidence/ExpressionSliders/previous_controls.json": {
+        "sha256": "9bcf1af24da5b8f58a4f02d6b4b6a985a04e3ea3fa51c774255941022e1f4208",
+        "moved_to": "Saved/FaceMigration/Characters/Seven/ExpressionSliders/previous_controls.json"
+      },
+      "Characters/Seven/Evidence/Eyeballs/max_samples.json": {
+        "sha256": "33fa340bb213bce6f4c6e074e5059bc11243c3510551eda540b265d57d840cba",
+        "moved_to": "Saved/FaceMigration/Characters/Seven/Eyeballs/max_samples.json"
+      },
+      "Characters/Seven/Evidence/Eyeballs/previous_controls.json": {
+        "sha256": "2c388d93f82df28a59501e570675926b8a21bbd22edf83f0cafc1db8cf4ab71c",
+        "moved_to": "Saved/FaceMigration/Characters/Seven/Eyeballs/previous_controls.json"
+      },
+      "Characters/Seven/Evidence/EyeExpressions/max_samples.json": {
+        "sha256": "bc8e04cc5cb23c4bbce643316b9902b9e0deab9add51174623d91b56eace53e4",
+        "moved_to": "Saved/FaceMigration/Characters/Seven/EyeExpressions/max_samples.json"
+      },
+      "Characters/Seven/Evidence/EyeExpressions/previous_controls.json": {
+        "sha256": "cdb90dece7cbf1e06d7c43d84424c457f8b9afe18242ba159074e40f1991e60a",
+        "moved_to": "Saved/FaceMigration/Characters/Seven/EyeExpressions/previous_controls.json"
+      },
+      "Characters/Seven/Evidence/GazeMaster/max_samples.json": {
+        "sha256": "d4620dff6ffdfe695a450aca1e9461ac3db533c739805bee72a8dd34c38ccb35",
+        "moved_to": "Saved/FaceMigration/Characters/Seven/GazeMaster/max_samples.json"
+      },
+      "Characters/Seven/Evidence/GazeMaster/previous_controls.json": {
+        "sha256": "11b684f77283c784309fd89b0812ad40b5b45ded362489ab8448ab5783dbd93e",
+        "moved_to": "Saved/FaceMigration/Characters/Seven/GazeMaster/previous_controls.json"
+      },
+      "Characters/Seven/Evidence/LipControls/max_samples.json": {
+        "sha256": "93129b4e3759b8e0acd232a0a1efdaa2c274697690bfcb99fbfd7e73d157b2c2",
+        "moved_to": "Saved/FaceMigration/Characters/Seven/LipControls/max_samples.json"
+      },
+      "Characters/Seven/Evidence/LipControls/previous_controls.json": {
+        "sha256": "650e05f42d1dd051f11434703d17071ef05eb825db119e55216db1daaa893482",
+        "moved_to": "Saved/FaceMigration/Characters/Seven/LipControls/previous_controls.json"
+      },
+      "Characters/Seven/Evidence/MouthControls/max_samples.json": {
+        "sha256": "2750f4dd9b14be7450710c932c68a507e07e1087df7d32cc454ecbefd0276e78",
+        "moved_to": "Saved/FaceMigration/Characters/Seven/MouthControls/max_samples.json"
+      },
+      "Characters/Seven/Evidence/MouthControls/previous_controls.json": {
+        "sha256": "a19dab3cff3e324f69338ac1be52ca29e2029878c9fac2eb75255c1567d61607",
+        "moved_to": "Saved/FaceMigration/Characters/Seven/MouthControls/previous_controls.json"
+      },
+      "Characters/Seven/Evidence/Nose/max_samples.json": {
+        "sha256": "2bf21de7fab8fdded204da567b4c4295560d6faa26c74b2f46d67b6ba899cb7c",
+        "moved_to": "Saved/FaceMigration/Characters/Seven/Nose/max_samples.json"
+      },
+      "Characters/Seven/Evidence/Nose/previous_controls.json": {
+        "sha256": "f4d881b911631a17e9bf0400233c593f412d6bf9942cffc5f09ca20e5ae46421",
+        "moved_to": "Saved/FaceMigration/Characters/Seven/Nose/previous_controls.json"
+      },
+      "Characters/Seven/Evidence/NoseSides/max_samples.json": {
+        "sha256": "8b619de9e62b1c5f74bc824b53a905d3cae8d083d3075e31b70a2b15c3386286",
+        "moved_to": "Saved/FaceMigration/Characters/Seven/NoseSides/max_samples.json"
+      },
+      "Characters/Seven/Evidence/NoseSides/previous_controls.json": {
+        "sha256": "26609b42de9ee2d69f95453bc9c69115dc2a85b070c738ae887402f1a49cd7ba",
+        "moved_to": "Saved/FaceMigration/Characters/Seven/NoseSides/previous_controls.json"
+      },
+      "Characters/Seven/Evidence/PhonemeReference/before_outputs.json": {
+        "sha256": "7aa82c95eab094e7df29ebe168fd52a392ca8ee504d83167df2d9a14e23eb208",
+        "moved_to": "Saved/FaceMigration/Characters/Seven/PhonemeReference/before_outputs.json"
+      },
+      "Characters/Seven/Evidence/PhonemeSliders/max_samples.json": {
+        "sha256": "ab0bc0165fa681f4f9ce7c7767b77af3240d7a7785588e27affd8e865374d552",
+        "moved_to": "Saved/FaceMigration/Characters/Seven/PhonemeSliders/max_samples.json"
+      },
+      "Characters/Seven/Evidence/PhonemeSliders/previous_controls.json": {
+        "sha256": "d4a43d988765525b4801afa364385af0b2e92de8afc9ae058492e6088fdf7e7f",
+        "moved_to": "Saved/FaceMigration/Characters/Seven/PhonemeSliders/previous_controls.json"
+      },
+      "Characters/Seven/Evidence/SevenRuntime/graph_export.txt": {
+        "sha256": "e7c3212012a35a2d98a47a05086f74721439172806890cbd283e50bda3673188",
+        "moved_to": "Saved/FaceMigration/Characters/Seven/SevenRuntime/graph_export.txt"
+      },
+      "Characters/Seven/Evidence/XYP/max_samples.json": {
+        "sha256": "60db4bc975a6357b4cb507eaedd8aab24c1a112b27a379665779871ce9a21ac4",
+        "moved_to": "Saved/FaceMigration/Characters/Seven/XYP/max_samples.json"
+      }
+    }
+  }
 }

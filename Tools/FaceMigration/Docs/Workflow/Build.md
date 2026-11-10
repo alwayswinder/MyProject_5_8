@@ -11,7 +11,7 @@
 | UE 示例 Rig | `/Game/_MyTest/Mouth/LidDiagnostic/CR_Seven_LidWorldRotation`，`ControlRigBlueprint` | 读取完整层级、图、控制设置、形状库、轨道和参考图；保持示例资产不变 |
 | Max 源场景 | `D:/Download/Seven_Skin_New.max`，参考帧 0；执行时核对实际场景 | 核查真实入口、空间、限位、枢轴、骨骼及 Morph，裁定动作是否正确 |
 | 目标网格 | `/Game/_MyTest/Mouth/Mesh/Seven` | 检查骨骼、Morph、参考姿势、单位及显示依赖 |
-| 输出 Rig | 用户明确指定的独立资产。2026-11-10 实际目标为 `/Game/_MyTest/Mouth/TMp/NewControlRigRuntimeAsset1`（空壳：149 骨、87 曲线、0 控制、1 节点）；旧的 `/Game/_MyTest/Mouth/TMp/NewControlRigRuntimeAsset` 已不在磁盘 | 先读当前内容和类型，再选择复制、类型迁移或增量修复；不能默认当作空资产 |
+| 输出 Rig | 用户明确指定的独立资产。2026-11-10 第二轮（当前）目标为 `/Game/_MyTest/Mouth/TMp/NewControlRigRuntimeAsset`（空壳：149 骨、87 曲线、0 控制、1 节点，构建后 1926 节点 / 2639 连接）；第一轮目标 `.../TMp/NewControlRigRuntimeAsset1` 已不在磁盘 | 先读当前内容和类型，再选择复制、类型迁移或增量修复；不能默认当作空资产 |
 | 外观与操作目标 | 用户提供的示例画面及上述示例资产 | 形状、尺寸、配色、布局、轨道、参考图和拖动手感都属于交付内容 |
 
 示例提供成熟控制设计，Max 核实动作。两者不一致时记录具体差异，结合源链和用户目标修正，不能把示例当作绝对正确答案。目标不能反过来充当自己的正确性基准。当前请求若只整理文档，就只改文档和配置说明，不运行构建、清空或覆盖 UE 资产。
@@ -48,6 +48,8 @@
 参考和目标用同一姿势、相近正面视角、缩放、选择状态及调试显示作对照。截图说明外观目标，准确参数以实际示例资产读取为准。方法和本次两张图见[形状与摆放](MigrationGuide.md#23-控制形状与摆放)。
 
 盘点必须实际读到依赖，不能只复制属性。2026-11-10 实测：目标初始只有一个 `/ControlRig/Controls/DefaultGizmoLibraryNormalized`，示例另有项目内 `/Game/_MyTest/Mouth/LidDiagnostic/PhonemeReference/SL_PhonemeReference`（依赖 `SM_PhonemeReference`、`M_PhonemeReference`）。构建只复制 `shape_libraries` 属性，不会检查这些包能否加载；换项目缺包时 73 个手柄会退回默认形状而数值仍全部通过。因此构建后要再断言一次：每个控制的 `shape_name` 能在形状库解析，库引用的网格和材质资产存在。UE 5.8.4 的可用读取方式见[工具选择](Tools.md#参考契约盘点ue-58-形状-api)；`gizmo_name`、`gizmo_color` 已废弃。
+
+这一步和下一步的探测、备份、路线判定由 `python Tools/FaceMigration/migrate.py run inventory_target.py --job <任务>` 一次完成，输出 `reference_inventory.json`、`binding_probe.json`、`adaptation_report.json`。读表与名单核对用 `check_character_task_sheet.py`（表缺失时只写草稿，不改包内文件）。
 
 ## 3. 选择改动最小的适配路线
 
@@ -130,7 +132,7 @@
 1. **示例 → 目标**：同角色比较接口、显示、行程、重置、骨骼及曲线；新角色比较功能语义及按比例适配的设计，不强求绝对坐标相同。
 2. **Max → 目标**：比较完整变换、Morph、组合及限位。保留示例已知近似，不能用迁移一致性掩盖源偏差。
 3. **目标正常帧**：核对 VM 所属资产和当前预览组件，确认时间推进；读取真实网格骨骼和最终动画曲线，恢复输入及最终输出。
-4. **保存重载**：保存、关闭目标资产编辑器、重载目标包，复验结构、接口、显示依赖和数值；确认示例包未改动。无需关闭整个 UE。重编译或重开预览若重新标记包为 dirty，交付前再保存一次并确认目标包已干净。注意 `ControlRigRuntimeAsset` 在 5.8.4 上保存成功后会被立即重新标记 dirty（连续三次 `only_if_is_dirty` 保存都返回 `True`）；此时以磁盘写入时间、包摘要和重载后复验作为持久化证据，不把 dirty 标志本身当作失败，也不要反复保存刷状态。
+4. **保存重载**：保存、关闭目标资产编辑器、重载目标包，复验结构、接口、显示依赖和数值；确认示例包未改动。无需关闭整个 UE。重编译或重开预览若重新标记包为 dirty，交付前再保存一次并确认目标包已干净。注意 `ControlRigRuntimeAsset` 在 5.8.4 上保存成功后会被立即重新标记 dirty（连续三次 `only_if_is_dirty` 保存都返回 `True`）；此时以磁盘写入时间、包摘要和重载后复验作为持久化证据，不把 dirty 标志本身当作失败，也不要反复保存刷状态。2026-11-10 第二轮实测相反：保存后 `dirty=false`、dirty 包 0，说明这是时序相关现象而非该资产类型的必然行为。
 5. **用户画面验收**：对照示例检查中性、中间/极限、左右和组合，检查拾取、拖动方向、面板遮挡、参考图及重置。未确认写“待用户验收”，用户指出明显差异则写“视觉验收未通过”。
 
 先比较外观和操作，再扩大数值采样，避免完成数千样本后才发现控制设计已被替换。呈现有代表性的阶段结果，不使用 computer-use，也不因文档列了画面验收就要求用户批准每次可逆修改。
@@ -140,6 +142,7 @@
 验证前先确认每条基线属于哪个资产谱系。2026-11-10 流程验证中，12 个部位验证器里的“源动作段”全部通过，但 `regression_`/`old` 段因 `previous_controls.json` 属于已废弃的采样求解资产而误报失败（该文件 130 个 case 的 `bones` 为空，脚本回落到“全部骨保持中性”的期望）。因此：
 
 - `previous_controls.json` 只在“升级同一求解、保留旧控行为”时才是必过项；从示例派生或空目标新建时，它不构成回归对象。
+- 该判定已由 `verify_runtime_face_controls.py` 自动完成：它先检查各部位基线的 `case.bones` 是否为空、`curves` 是否都在当前层级、文件是否存在，再给出 `legacy_status`（`applicable` / `not_applicable`）与 `legacy_reason`。`not_applicable` 时不运行该段、不把它算作通过，也不算作失败；`summary.json` 的 `passed` 只由迁移对照 + 显示契约（+ 同谱系时的旧控回归）决定。因此 `finalize_runtime_face_controls.py` 可以直接用于示例派生/空目标路线。
 - 报告要分段给结论：结构、示例→目标、Max→目标、显示契约、保存重载、正常帧预览、用户画面。
 - 被跳过的段要写原因和影响范围，不能把 `passed=false` 直接当成资产缺陷，也不能为了提高通过率伪造同谱系基线。
 
@@ -149,7 +152,7 @@ Seven 的上眼皮近似、脸颊参考偏差和历史验证范围仍保留在[�
 
 ## 7. 输出和交接
 
-配置用独立 `Jobs/*.json`，报告放目标项目 `Saved/FaceMigration/Jobs/<job_id>/Current/Evidence/`，临时探测放 `Current/Temp/`。正式采纳的新角色参数按包约定归档，不改写 Seven 冻结证据，不为每次运行复制一套脚本或 README。
+配置用独立 `Jobs/*.json`，报告放目标项目 `Saved/FaceMigration/Jobs/<job_id>/Current/Evidence/`，临时探测放 `Current/Temp/`。原始采样和回归快照放 `Saved/FaceMigration/Characters/<角色>/`，不写回工具包；包内只保留 `parameters.json`、`bone_names.txt` 这类小输入与报告。正式采纳的新角色参数按包约定归档，不改写 Seven 冻结证据，不为每次运行复制一套脚本或 README。
 
 | 固定报告 | 内容 |
 |---|---|

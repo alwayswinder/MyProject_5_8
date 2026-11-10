@@ -10,7 +10,9 @@
 
 默认流程为**示例 Rig 派生 + Max 源核验 + 目标适配**，见[唯一主流程](Docs/Workflow/Build.md)。当前示例是 `/Game/_MyTest/Mouth/LidDiagnostic/CR_Seven_LidWorldRotation`：允许读取、复制和复用实现，保留控制形状、配色、滑轨、参考图、行程和操作方式。Max 核对真实动作；新角色重新绑定并适配参数。2026-11-10 的从零重建外观已被用户指出不符合示例，数值通过不能作为整体验收通过。
 
-2026-11-10 另做了一次“当成新角色”的流程验证：示例、当前 Max 角色和用户新建的 `/Game/_MyTest/Mouth/TMp/NewControlRigRuntimeAsset1` 被当作三个不同角色处理，先独立探测目标绑定，再继承示例设计并在空目标上构建。结果分段记录：结构、示例→目标（1175 组 worst 全 0）、显示契约（0 差异）、上眼皮 Max 抽检（0.00344 cm / 0.00059°）和保存重载通过；**正常帧预览未通过**（Rig 时间停在 0.4 s，两次 refresh 未恢复）；用户画面待验收。执行配置为 `Jobs/seven-newchar-20261110.json`，问题清单在该任务 `Current/Evidence/flow_findings.md`。旧的 `TMp/NewControlRigRuntimeAsset` 已不在磁盘，只能作为历史记录引用；此前的增量恢复任务 `seven-reference-adapt` 保留为历史。实际状态和范围见[角色记录](Characters/Seven/README.md)。最终画面与拾取手感仍由用户验收。
+2026-11-10 另做了一次“当成新角色”的流程验证：示例、当前 Max 角色和用户新建的 `/Game/_MyTest/Mouth/TMp/NewControlRigRuntimeAsset1` 被当作三个不同角色处理，先独立探测目标绑定，再继承示例设计并在空目标上构建。结果分段记录：结构、示例→目标（1175 组 worst 全 0）、显示契约（0 差异）、上眼皮 Max 抽检（0.00344 cm / 0.00059°）和保存重载通过；**正常帧预览未通过**（Rig 时间停在 0.4 s，两次 refresh 未恢复）；用户画面待验收。执行配置为 `Jobs/seven-newchar-20261110.json`，问题清单在该任务 `Current/Evidence/flow_findings.md`。该目标 `Asset1` 随后被删除，本轮记录只作历史。
+
+2026-11-10 第二轮按 TASK.md 第 5 节协议在新空壳 `/Game/_MyTest/Mouth/TMp/NewControlRigRuntimeAsset` 上完整重跑（配置 `Jobs/seven-taskflow-20261110.json`）：结构、示例→目标（1175 组 worst 全 0）、显示契约（0 差异、55 个形状名全部可解析）、上眼皮 Max 抽检（主骨 0.00344 cm / 0.0808°）、保存重载全部通过；**正常帧预览仍未通过**（时钟停 0.4 s，两次 refresh 无效；手动 Forwards Solve 能出 rig 曲线，但网格动画曲线仍为 0）；12 个部位验证器 2/12 属旧控回归谱系误报。执行与问题清单在 `Saved/FaceMigration/Jobs/seven-taskflow-20261110/Current/Evidence/flow_findings.md`。此前的增量恢复任务 `seven-reference-adapt` 保留为历史。实际状态和范围见[角色记录](Characters/Seven/README.md)。最终画面与拾取手感仍由用户验收。
 
 ```text
 Tools/FaceMigration/
@@ -28,7 +30,7 @@ Tools/FaceMigration/
 
 ## 迁移到其他项目
 
-1. 复制整个 `FaceMigration` 文件夹，不复制原项目的 `Saved`。另外准备示例 Rig 及其形状库、材质和贴图依赖，以及 Max 场景、UE 网格、骨架和 Morph；工具包不包含这些 UE 资产。
+1. 复制整个 `FaceMigration` 文件夹，不复制原项目的 `Saved`。另外准备示例 Rig 及其形状库、材质和贴图依赖，以及 Max 场景、UE 网格、骨架和 Morph；工具包不包含这些 UE 资产，也不包含原始采样（在 `Saved/FaceMigration/Characters/<角色>/`，需要时从原项目拷回或重新采样）。
 2. 在 `Jobs/` 增加小型 JSON 配置，使用独立 `job_id`、`character` 和 `asset_overrides`。保留示例和目标为不同资产。一个目标一份配置：`asset_overrides` 必须精确命中脚本里写死的包路径（默认是 `/Game/_MyTest/Mouth/TMp/NewControlRigRuntimeAsset`），它只影响 `asset_path()` / `asset_disk_path()` 的调用点，不影响脚本里的日志或外部命令。换资产后先用 `probe_cr_migration.py` 复核报告里的 `target` 字段，确认没有读写旧路径。旧配方配置 [seven-runtime.json](Jobs/seven-runtime.json) 会将多条 Rig 路径映射到同一目标，不能用于需要独立示例的整图迁移，也不是全量重建清单。
 3. 按[主流程](Docs/Workflow/Build.md)先读取并继承示例控制设计，再核对 Max。相同角色保留经验证的实现；新角色重新绑定、定参，只为差异或缺项采样拟合。路径可迁移不等于数值通用。
 4. 在目标项目根运行以下检查。工具包放在其他位置时，通过 `--project` 指定 `.uproject` 所在目录。
@@ -66,6 +68,16 @@ python Tools/FaceMigration/migrate.py run probe_cr_migration.py --job seven-loca
 ## 调用脚本
 
 ```powershell
+# 接任务单的固定顺序（全部是包内入口，不需要临时脚本）
+python Tools/FaceMigration/migrate.py run check_character_task_sheet.py --job <任务>
+python Tools/FaceMigration/migrate.py run inventory_target.py --job <任务>
+python Tools/FaceMigration/migrate.py run build_runtime_face_controls.py --job <任务>
+python Tools/FaceMigration/migrate.py run verify_runtime_face_controls.py --job <任务>
+python Tools/FaceMigration/migrate.py run crosscheck_max_control.py --job <任务>
+python Tools/FaceMigration/migrate.py run finalize_runtime_face_controls.py --job <任务>
+python Tools/FaceMigration/migrate.py run probe_runtime_face_morph_preview.py --job <任务>
+python Tools/FaceMigration/migrate.py run assemble_delivery.py --job <任务> --offline
+
 # 连接正在运行的目标 UE，执行只读探测；引擎通常可从项目关联/安装位置发现
 python Tools/FaceMigration/migrate.py run probe_cr_migration.py --job seven-local
 
@@ -98,14 +110,19 @@ pwsh -File Tools/FaceMigration/Scripts/max_run.ps1 -ScriptFile probe_mouth_sampl
 ## 输出与保留规则
 
 ```text
-<目标项目>/Saved/FaceMigration/Jobs/<job_id>/
-  .face-migration.json  所属项目、角色和任务配置
-  Current/
-    Evidence/          本任务报告、拟合结果、当前回归快照
-    Temp/              原始采样输入、日志、一次性诊断
-    Backups/           修改前资产备份
-  History/             显式交付归档
+<目标项目>/Saved/FaceMigration/
+  Characters/<角色>/      外置证据：max_samples、previous_controls、图导出、采样清单
+  Imported/               历史批次（例如 CR58）
+  Jobs/<job_id>/
+    .face-migration.json  所属项目、角色和任务配置
+    Current/
+      Evidence/          本任务报告、拟合结果、当前回归快照
+      Temp/              原始采样输入、日志、一次性诊断
+      Backups/           修改前资产备份
+    History/             显式交付归档
 ```
+
+工具包本身只保留参数（`parameters.json`）、小报告、文档和脚本；原始采样等大文件放 `Saved/FaceMigration/Characters/<角色>/`。`read_path` 的顺序是：本任务 `Current/Evidence/` → 项目侧 `Characters/<角色>/` → 包内 `Evidence/`。因此复制工具包到新项目后不会带上采样，新项目要么按 [TASK.md](TASK.md) 重新采样，要么从原项目手工拷回同名目录。
 
 读取参数或基准时，优先使用同任务 `Current/Evidence/` 中的当前文件，再读取包内角色基准。构建、重载和预览报告必须来自当前任务，缺失时不会沿用历史通过状态。更换目标、角色或资产映射时使用新任务 ID。
 

@@ -33,7 +33,8 @@ def evaluate(params,inputs):
 
 def main():
     if '--prepare' in sys.argv:
-        names=json.loads((_fm_read(_fm_tool('Docs/Evidence/LipControls/previous_controls.json'))).read_text(encoding='utf-8'))['neutral']
+        compact=_fm_tool('Docs/Evidence/LipControls/bone_names.txt')
+        names=_fm_read(compact).read_text(encoding='utf-8').split('\n')
         folder=_fm_saved('')
         _fm_output(folder).mkdir(parents=True,exist_ok=True)
         (_fm_output(folder/'cheek_bone_names.txt')).write_text('\n'.join(names),encoding='utf-8')

@@ -11,7 +11,7 @@
 
 ## 执行约定
 
-- **分别确认示例、Max 源和输出目标。** 当前示例是 `/Game/_MyTest/Mouth/LidDiagnostic/CR_Seven_LidWorldRotation`，类型 `ControlRigBlueprint`；Max 核对真实动作，示例提供成熟控制设计。2026-11-10 流程验证在用户新建的空壳 `/Game/_MyTest/Mouth/TMp/NewControlRigRuntimeAsset1` 上完成（`ControlRigRuntimeAsset`，149 骨、87 曲线、0 控制、1 节点）；旧的 `/Game/_MyTest/Mouth/TMp/NewControlRigRuntimeAsset` 已不在磁盘，只能作为历史记录引用。流程要求把示例、当前 Max 角色和新目标当作三个不同角色处理，见[新角色与示例骨架相同的情况](Workflow/Build.md#新角色与示例骨架相同的情况)。本轮技术检查分段记录：结构、示例→目标、显示契约、Max 抽检、保存重载通过；正常帧预览未通过；用户画面待确认。当前任务为 `seven-newchar-20261110`，问题清单在该任务的 `Current/Evidence/flow_findings.md`。历史运行资料见 [运行时资产记录](../Characters/Seven/Evidence/SevenRuntime/README.md)，当前状态见[角色记录](../Characters/Seven/README.md)。
+- **分别确认示例、Max 源和输出目标。** 当前示例是 `/Game/_MyTest/Mouth/LidDiagnostic/CR_Seven_LidWorldRotation`，类型 `ControlRigBlueprint`；Max 核对真实动作，示例提供成熟控制设计。2026-11-10 第二轮按 TASK.md 协议在空壳 `/Game/_MyTest/Mouth/TMp/NewControlRigRuntimeAsset`（`ControlRigRuntimeAsset`，149 骨、87 曲线、0 控制、1 节点）上完成构建；第一轮目标 `.../TMp/NewControlRigRuntimeAsset1` 已不在磁盘，只能作为历史记录引用。流程要求把示例、当前 Max 角色和新目标当作三个不同角色处理，见[新角色与示例骨架相同的情况](Workflow/Build.md#新角色与示例骨架相同的情况)。本轮技术检查分段记录：结构、示例→目标、显示契约、Max 抽检、保存重载通过；正常帧预览未通过；用户画面待确认。当前任务为 `seven-taskflow-20261110`，问题清单在该任务的 `Current/Evidence/flow_findings.md`。历史运行资料见 [运行时资产记录](../Characters/Seven/Evidence/SevenRuntime/README.md)，当前状态见[角色记录](../Characters/Seven/README.md)。
 - **继承控制设计后再适配。** 同角色优先复制、完整类型迁移或增量修复，保留形状、颜色、面板轨道、参考图、操作轴和行程；新角色保留设计并重新绑定、定参。默认不做全量拟合和统一默认形状重建。示例资产保持不变，目标已有内容时不为运行空目标构建器而先清空。
 - 名称表是功能入口映射。新角色必须重新探测骨骼、Morph、活动控制层、限位、空间、枢轴和增益；不复制 Seven 的绝对坐标或数值。现有脚本大多固定 Seven，适配目标与依赖后再执行，当前没有读取表格即通用一键生成的程序。
 - 修改前备份磁盘包和内存状态；采样保存并恢复帧、底层控制值和预览输入，异常时同样恢复并读回。保留已有控制接口、执行链和骨骼 / 曲线输出。
@@ -29,7 +29,8 @@
 | `Recipes/` | 部位的实际实现、参数解释、脚本及验证范围 |
 | `Troubleshooting/` | 仍有复用价值的故障原因与判定依据 |
 | `../Characters/<角色>/Evidence/` | 只读源采样、拟合参数、历史回归基准及报告；其中 JSON 会被脚本直接读取 |
+| `<目标项目>/Saved/FaceMigration/Characters/<角色>/` | 外置的大采样、回归快照和图导出；`read_path` 优先读这里，包内只留参数与小报告 |
 
 本 Docs 顶层只保留本 AI 入口和 `migration.config.json`。文档链接相对当前文档；JSON 的文档 / 证据路径相对工具包根目录。新增角色数据放 `../Characters/<角色>/`，不覆盖 Seven。运行配置放 `../Jobs/`，本次报告和备份写到目标项目的 `Saved/FaceMigration/Jobs/<任务>/Current/`。完整保留与清理规则见 [包维护约定](../AGENTS.md)。
 
-角色 `Evidence/` 中的旧计数是对应批次快照，不能批量改成当前计数；采样、参数和 `previous_controls.json` 是复现及回归输入，不因文件大或日期早而删除。变更路径时同步模板、角色表、脚本引用和链接，并运行 `python Tools/FaceMigration/migrate.py check`。同功能修改共用脚本，换目标改任务配置，不新增项目专用重放副本。
+角色 `Evidence/` 中的旧计数是对应批次快照，不能批量改成当前计数；采样、参数和 `previous_controls.json` 是复现及回归输入，不因文件大或日期早而删除——但大文件保存在目标项目 `Saved/FaceMigration/Characters/<角色>/`，包内只留参数、清单和小报告（见上表 `moved_out`）。变更路径时同步模板、角色表、脚本引用和链接，并运行 `python Tools/FaceMigration/migrate.py check`。同功能修改共用脚本，换目标改任务配置，不新增项目专用重放副本。

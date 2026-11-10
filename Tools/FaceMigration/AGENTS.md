@@ -5,10 +5,12 @@
 ## 维护规则
 
 - 正式入口是 `python Tools/FaceMigration/migrate.py`，命令从目标项目根运行。离线检查用 `check`；调用现有脚本用 `run <文件名> --job <任务名>`。不要重新创建项目根 `Docs` / `Scripts`。
+- 接任务单的八个固定入口见 [工具选择](Docs/Workflow/Tools.md#主流程入口按顺序执行全部在包内)：`check_character_task_sheet.py` → `inventory_target.py` → `build_runtime_face_controls.py` → `verify_runtime_face_controls.py` → `crosscheck_max_control.py` → `finalize_runtime_face_controls.py` → `probe_runtime_face_morph_preview.py` → `assemble_delivery.py`。新角色照这串执行；需要新能力时扩展这些共用脚本，不再往任务 `Temp/` 写一次性入口。
 - 同一功能修改共用脚本；换项目、Rig 路径用 `Jobs/*.json`。参数化路径不代表任意角色的求解已经通用化；新角色仍须重新采样、拟合、补齐名称映射和验证。
 - 不为每次运行新增 `build_<项目>.py`、`probe_<项目>.py`、`replay_*.py` 或一套 README。临时诊断放目标项目的 `Saved/FaceMigration/Jobs/<任务>/Current/Temp/`；有复用价值的功能合入现有脚本。
 - `Characters/Seven/Evidence/` 为整理前历史数据，包括已有未提交修改，受 `preservation.manifest.json` 保护。其中旧绝对路径属于历史记录，不作为现行执行入口。历史 `.py` / `replay_*.py` 只用于追溯，禁止原样执行。
-- 新写入通过 `face_paths.output_path()`，新读取通过 `read_path()`。同任务当前输出优先于角色基准。源采样、参数、回归基准随角色保存一份；运行报告不得写回工具包。正式采纳新参数时才有意更新角色基准及摘要，不能自动覆盖历史证据。
+- 新写入通过 `face_paths.output_path()`，新读取通过 `read_path()`。读取顺序为：本任务 `Current/Evidence/` → 目标项目 `Saved/FaceMigration/Characters/<角色>/` → 包内 `Characters/<角色>/Evidence/`。运行报告不得写回工具包。正式采纳新参数时才有意更新角色基准及摘要，不能自动覆盖历史证据。
+- **包内只放可迁移的常量**：脚本、文档、`face-controls.json`、`parameters.json`、小报告和采样清单。原始采样（`max_samples.json`、`previous_controls.json`、`before_outputs.json`）、图文本导出和历史批次放目标项目 `Saved/FaceMigration/Characters/<角色>/`，历史批次放 `Saved/FaceMigration/Imported/`。复制工具包到新项目时**不要**复制这些大文件；新项目按 TASK.md 重新采样，或从原项目手工拷回同名目录。2026-11-10 已按此规则把 176.7 MB 移出包（包内由 181 MB 降到 4.5 MB），移动清单见 `preservation.manifest.json` 的 `moved_out`；脚本引用这些路径时，校验以 `moved_out` 认定有效。
 - 新任务输出位于目标项目 `Saved/FaceMigration/Jobs/<job_id>/Current/`。任务 ID / 角色 / 资产映射不能用于另一套目标后继续读取旧结果；换目标用独立 ID。
 - 当前报告使用固定文件名。成功的同步调用后，各备份组保留最近 3 份；显式 `archive` 保留最近 3 份归档。失败调用不自动清理。`.keep` 目录固定保留；未标记、名称不符的目录不清理。采样基准、`Imported` 和已有 `Saved/Codex` 不参与自动清理。
 - 修改前备份目标资产，保留原控制接口和执行链；采样无论成功或失败都恢复输入并读回。检查源对照、原控回归、正常帧预览和保存重载，不能把历史报告、编译或名称存在当作本次通过。

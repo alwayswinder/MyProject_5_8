@@ -64,6 +64,11 @@ class Context:
         return PACKAGE_ROOT/'Characters'/self.character/'Evidence'
 
     @property
+    def character_data(self):
+        """项目侧角色证据：原始采样等大文件不随包迁移，放在目标项目里。"""
+        return self.project/'Saved/FaceMigration/Characters'/self.character
+
+    @property
     def managed(self):
         return self.project/'Saved/FaceMigration/Jobs'/self.job_id
 
@@ -167,15 +172,33 @@ def break_link(controller, path):
 
 
 def read_path(path):
+    """读取顺序：本任务当前输出 → 项目侧角色证据 → 包内角色基准。
+
+    原始采样（max_samples / previous_controls 等）不随包迁移，放在
+    <目标项目>/Saved/FaceMigration/Characters/<角色>/；同名的包内文件只在
+    项目侧缺失时作为只读基准回退。
+    """
     path = normalize_legacy_path(path)
     ctx = context()
     if path.is_relative_to(ctx.data):
-        output = ctx.current/'Evidence'/path.relative_to(ctx.data)
+        relative = path.relative_to(ctx.data)
+        output = ctx.current/'Evidence'/relative
         if output.is_file():
             _verify_managed(ctx)
             return output
+        project_side = ctx.character_data/relative
+        if project_side.is_file():
+            return project_side
         if ctx.explicit_job and path.name in _CURRENT_REPORTS:
             raise FileNotFoundError('本项目本任务没有本轮报告，禁止沿用历史通过状态: ' + str(output))
+    return path
+
+
+def character_output_path(relative=''):
+    """写项目侧角色证据；新采集的采样与参数不写进工具包。"""
+    ctx = context()
+    path = contained(ctx.character_data/str(relative).replace('\\', '/').strip('/'), ctx.project)
+    path.parent.mkdir(parents=True, exist_ok=True)
     return path
 
 

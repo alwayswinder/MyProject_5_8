@@ -4,6 +4,29 @@
 
 默认先读取用户指定的示例 `/Game/_MyTest/Mouth/LidDiagnostic/CR_Seven_LidWorldRotation`，保留其控制接口、图、形状、轨道、配色和参考图，再结合 Max 核验动作。新角色按差异重新绑定和定参；从零采样重建属于显式选择的实验路线，不再是默认入口。文档整理任务不连接编辑器执行构建。
 
+## 主流程入口（按顺序执行，全部在包内）
+
+接任务单到交付不再需要临时脚本。每一步一个固定入口，命令从目标项目根运行：
+
+| # | 步骤 | 命令 | 输出（本任务 `Current/Evidence/`） |
+|---|---|---|---|
+| 1 | 读表、核对/草拟角色表与采样脚本名单 | `migrate.py run check_character_task_sheet.py --job <任务>` | `task_sheet_check.json`（表缺失时写 `face-controls.draft.json`） |
+| 2 | 备份目标、盘点示例契约、独立绑定探测、判路线 | `migrate.py run inventory_target.py --job <任务>` | `reference_inventory.json`、`binding_probe.json`、`adaptation_report.json`、`Backups/` |
+| 3 | 空目标构建（仅当 `route=derive_...` 且目标为空） | `migrate.py run build_runtime_face_controls.py --job <任务>` | `SevenRuntime/build_report.json`、图文本导出 |
+| 4 | 迁移对照 + 显示契约 + 部位验证器分段 | `migrate.py run verify_runtime_face_controls.py --job <任务>` | `SevenRuntime/before_reload/summary.json`、`layout_validation.json` |
+| 5 | Max 抽检一个代表控制 | `migrate.py run crosscheck_max_control.py --job <任务>` | `max_crosscheck_<name>.json` + `_max.json`（Max 原始采样） |
+| 6 | 保存、关闭、重载、复验、收尾状态 | `migrate.py run finalize_runtime_face_controls.py --job <任务>` | `reload_report.json`、`final_state.json` |
+| 7 | 正常帧预览（必要时刷新一次） | `migrate.py run probe_runtime_face_morph_preview.py --job <任务>`；停滞再跑 `refresh_runtime_face_preview.py` | `SevenRuntime/preview_morph_check.json`（含 `stall_diagnosis`） |
+| 8 | 汇总分段结论 | `migrate.py run assemble_delivery.py --job <任务> --offline` | `validation.json`、`delivery_check.json` |
+
+要点：
+
+- 第 1 步的名单核对会解析 TASK.md 第 2 节的表格（容错对齐空格），并把 `.ms` 里的字符串字面量分成“控制器名 / 骨架骨骼名 / 未知辅助体”，因此 `names = #(...)`、`TARGETS = #(...)` 这类写法都能识别。
+- 第 2 步的 `route` 有三值：`derive_from_reference_equivalence_check`（等价且目标为空）、`incremental_repair_existing_target`（目标已有内容）、`rebind_and_refit`（骨架/Morph 不一致）。第 3 步只在第一种情况执行；已有内容时构建器会拒绝，属预期。
+- 第 5 步的抽检参数来自任务配置的 `crosscheck` 段（或 `Characters/<角色>/crosscheck.json`）：控制名、Max 对象、控制器槽位、轴、UI 缩放、骨表、主骨与容差。Max 采样由 MaxScript 直接返回，**不经过人工转录**；`safe_mode` 只拦文件写，返回载荷不受影响。
+- 第 4 步把“旧控回归”当成分段而非全局门禁：`legacy_status=not_applicable` 时写原因（`case.bones` 为空、历史曲线名不在当前层级、缺 `previous_controls.json`），不跑该段，也不把它算作通过。
+- 第 6 步的保存前门禁 = 迁移对照 + 显示契约通过；旧控回归仅在同谱系时才要求通过。因此空目标/示例派生路线可以使用官方保存重载入口，不再需要自写重载脚本。
+
 ## 工具连接
 
 | 任务 | 入口 | 使用要求 |
@@ -31,6 +54,8 @@ UE 远程节点不可用时，继续做离线资料检查并明确未进行实�
 | 限位显示 | `settings.draw_limits`、`settings.shape_visible` | 不要与控制自身 `scale` 混用 |
 
 `RigHierarchyController` 没有 `get_control_shape_transform`；形状读取在 `RigHierarchy` 上。探测失败时先怀疑接口名，不要先判“示例没有形状设置”。示例当前两个形状库：`/ControlRig/Controls/DefaultGizmoLibraryNormalized` 与项目内 `SL_PhonemeReference`。
+
+2026-11-10 第二轮补充（实测）：`ControlRigShapeLibrary.shapes` 是 struct 数组，元素只能读 `shape_name`；`get_class()`、`mesh`、`material`、`type` 全部报 `Failed to find property`。项目库里的形状名带库前缀（`SL_PhonemeReference.PhonemeReference`），而 `DefaultGizmoLibraryNormalized` 有 54 项、`SL_PhonemeReference` 1 项。判断“形状能否解析”时要按 `库名.形状名` 拆分，否则会把正常资产判成形状缺失。取骨骼/控制的全局变换直接传 element 本身（`hierarchy.get_global_transform(bone, True)`）；`RigElementKey` 没有 `get_key()`。
 
 ## 按依赖查 Seven 脚本
 
@@ -78,7 +103,7 @@ UE 远程节点不可用时，继续做离线资料检查并明确未进行实�
 
 `design_plan.json` 包含独立 `source` / `target`、`head_bone`、原模型 `source_axes`，以及逐控制的 `name`、`role_id`、`matrix`（源原始输入对 UI 的 3×3 矩阵）、`inverse`、`source_bounds`、UI 限位和测试姿势。矩阵须从源活动层、空间与示例接口核定；仅支持复用已经验证的采样求解，当前不自动推导任意角色。`solver_before.json` 是执行前盘点，不是另一目标的历史通过报告；须核对其节点、控制、源轴和目标路径。新角色应适配脚本中的结构断言。
 
-执行前读取两套图并制作上述计划，在 Max 采集本轮覆盖新 UI 行程的独立样本，保存原值，采后恢复底层输入并读回。输入恢复、原始参考差异和固定参考配准另存报告。`seven-reference-adapt` 是 2026-11-10 上一轮的增量恢复任务，其目标 `TMp/NewControlRigRuntimeAsset` 已不在磁盘；当前流程验证任务为 `seven-newchar-20261110`，在空壳 `...Asset1` 上从示例构建，不使用旧 `seven-runtime` 的合并资产映射。`adapt_sampled_face_design.py` 只适用于“保留既有采样求解、再补示例设计”，对空目标不适用。
+执行前读取两套图并制作上述计划，在 Max 采集本轮覆盖新 UI 行程的独立样本，保存原值，采后恢复底层输入并读回。输入恢复、原始参考差异和固定参考配准另存报告。`seven-reference-adapt` 是 2026-11-10 第一轮的增量恢复任务，其目标已不在磁盘；第一轮流程验证任务 `seven-newchar-20261110` 的目标 `...Asset1` 也已删除。当前流程验证任务为 `seven-taskflow-20261110`，在空壳 `TMp/NewControlRigRuntimeAsset` 上从示例构建，不使用旧 `seven-runtime` 的合并资产映射。`adapt_sampled_face_design.py` 只适用于“保留既有采样求解、再补示例设计”，对空目标不适用。
 
 ```powershell
 python Tools/FaceMigration/migrate.py run adapt_sampled_face_design.py --job seven-reference-adapt

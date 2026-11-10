@@ -48,6 +48,8 @@ def validate():
             except (ValueError,OSError) as exc:
                 errors.append(f'{path.relative_to(ROOT)}: {exc}')
     counts['json_parsed'] = len(parsed)
+    manifest = parsed.get(ROOT/'preservation.manifest.json',{})
+    moved_out = set(manifest.get('moved_out',{}).get('files',{}))
     markdown = [p for p in files if p.suffix == '.md']
     links = 0
     for path in markdown:
@@ -60,7 +62,9 @@ def validate():
             target = (path.parent/part).resolve() if part else path
             links += 1
             require(target.is_relative_to(ROOT), f'{path.relative_to(ROOT)}: 包外文件链接 {value}')
-            require(target.exists(), f'{path.relative_to(ROOT)}: 断链 {value}')
+            # 大文件可能已移到目标项目；链接仍指向包内相对位置，用 moved_out 清单认定有效。
+            relocated = target.is_relative_to(ROOT) and target.relative_to(ROOT).as_posix() in moved_out
+            require(target.exists() or relocated, f'{path.relative_to(ROOT)}: 断链 {value}')
             if anchor and target.is_file() and target.suffix == '.md':
                 require(anchor in headings(target.read_text(encoding='utf-8-sig')),f'{path.relative_to(ROOT)}: 无效标题 {value}')
         for value in re.findall(r'`(Tools/FaceMigration/[^`\n]+)`',text):
@@ -68,7 +72,8 @@ def validate():
                 continue
             if value.endswith(('.md','.json','.py','.ms','.ps1')):
                 target = ROOT/value[len('Tools/FaceMigration/'):].replace('\\','/')
-                require(target.exists(), f'{path.relative_to(ROOT)}: 失效内联路径 {value}')
+                require(target.exists() or target.relative_to(ROOT).as_posix() in moved_out,
+                        f'{path.relative_to(ROOT)}: 失效内联路径 {value}')
     counts['markdown_files'] = len(markdown)
     counts['local_links'] = links
 
@@ -112,6 +117,8 @@ def validate():
     counts['recipe_groups']=len(config.get('recipes',{}))
 
     scripts=0
+    manifest=parsed.get(ROOT/'preservation.manifest.json',{})
+    moved_out=set(manifest.get('moved_out',{}).get('files',{}))
     for path in (ROOT/'Scripts').glob('*.py'):
         try:
             tree=ast.parse(path.read_text(encoding='utf-8-sig'))
@@ -127,7 +134,10 @@ def validate():
             if isinstance(node,ast.Call) and isinstance(node.func,ast.Name) and node.func.id=='_fm_tool' and node.args and isinstance(node.args[0],ast.Constant):
                 value=node.args[0].value
                 if isinstance(value,str):
-                    require(tool_path(value).exists(),f'{path.name}: 包内引用缺失 {value}')
+                    target=tool_path(value)
+                    relative=target.relative_to(ROOT).as_posix() if target.is_relative_to(ROOT) else ''
+                    require(relative in moved_out or target.exists(),
+                            f'{path.name}: 包内引用缺失 {value}（既不在包内也不在 moved_out 清单）')
     counts['python_scripts_parsed']=scripts
     manifest=parsed.get(ROOT/'preservation.manifest.json',{})
     require(bool(manifest.get('frozen_files')),'缺少保留摘要')
