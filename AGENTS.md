@@ -91,10 +91,10 @@ Misconceptions to avoid: there is no `load_toolset` tool, and toolset names are 
 | Route | Endpoint | Notes |
 |---|---|---|
 | Built-in server | `http://127.0.0.1:8000/mcp` | `ModelContextProtocolSettings.Server=True` in Saved config, so it auto-starts |
-| `Scripts/ue-mcp.ps1` | same endpoint | dependency-free PowerShell client (`-Toolsets`, `-Describe`, `-Toolset` / `-Tool`) |
+| `Tools/FaceMigration/Scripts/ue-mcp.ps1` | same endpoint | dependency-free PowerShell client (`-Toolsets`, `-Describe`, `-Toolset` / `-Tool`) |
 | `.claude/settings.local.json` | `127.0.0.1:8091` | launches third-party `npx unreal-engine-mcp-server`; unrelated to the built-in server |
 
-`Scripts/ue-mcp.ps1` is a **copy** — the canonical version lives in the DSH repo at `_mytools\Mode\dsh-unreal\tools\ue-mcp.ps1`. Edit that one and re-copy.
+`Tools/FaceMigration/Scripts/ue-mcp.ps1` is a **copy** — the canonical version lives in the DSH repo at `_mytools\Mode\dsh-unreal\tools\ue-mcp.ps1`. Edit that one and re-copy.
 
 ## Common Tasks
 
@@ -115,7 +115,7 @@ Codex --permission-mode bypassPermissions
 There is no `ClaudeStart.bat` in the repo root. To regenerate the MCP client config, run `ModelContextProtocol.GenerateClientConfig Codex` (or `All`) in the editor console — it writes `.mcp.json` into the project root.
 
 ### Run Python
-There is no `Content/Python` anymore (deleted with the content). Use the editor's Python console, or add scripts under `Scripts/`.
+There is no `Content/Python` anymore (deleted with the content). Use the editor's Python console, or use `Tools/FaceMigration/migrate.py` and reusable scripts under `Tools/FaceMigration/Scripts/`; temporary probes belong in `Saved/FaceMigration/`.
 
 ### Generate Visual Studio project files
 Right-click `.uproject` > "Generate Visual Studio project files", or run `UnrealBuildTool -projectfiles`.
@@ -143,3 +143,10 @@ Right-click `.uproject` > "Generate Visual Studio project files", or run `Unreal
 - `MetaHuman` stack — `MetaHuman`, `MetaHumanGenerator`, `MetaHumanCharacter`, `MetaHumanCrowd`, …
 - `PCGBiomeCore` / `PCGBiomeSample` — PCG biome graphs
 - `BlueprintAssist`, `Terminal`, `ModelingToolsEditorMode`, `Landmass`, `InEditorDocumentation` — editor productivity
+
+## Portable face migration package
+
+The former Docs, Scripts and related ProjectNotes are now inside `Tools/FaceMigration/`.
+Start with [package instructions](Tools/FaceMigration/AGENTS.md) and [usage](Tools/FaceMigration/README.md).
+Run `python Tools/FaceMigration/migrate.py check` for offline checks. Do not recreate project-root Docs/Scripts or project-specific script copies.
+Character samples and regression baselines are preserved under `Tools/FaceMigration/Characters/`; generated reports, probes and backups belong in the target project's `Saved/FaceMigration/`.

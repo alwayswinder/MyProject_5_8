@@ -1,0 +1,23 @@
+# 面部迁移工具包入口
+
+内部推理、计划和中间分析使用中文。此包可整体复制到其他项目的 `Tools/FaceMigration/`，不依赖原项目绝对路径。新角色从[任务单](TASK.md)开始：用户在那一份表里填示例 CR、目标 CR 和 Max 控制器名单，AI 据此生成 `Jobs/`、`Characters/<角色>/face-controls.json` 并执行流程。然后读[使用说明](README.md)，按[迁移流程](Docs/AGENTS.md)执行。最终画面由用户确认，不使用 computer-use。
+
+## 维护规则
+
+- 正式入口是 `python Tools/FaceMigration/migrate.py`，命令从目标项目根运行。离线检查用 `check`；调用现有脚本用 `run <文件名> --job <任务名>`。不要重新创建项目根 `Docs` / `Scripts`。
+- 同一功能修改共用脚本；换项目、Rig 路径用 `Jobs/*.json`。参数化路径不代表任意角色的求解已经通用化；新角色仍须重新采样、拟合、补齐名称映射和验证。
+- 不为每次运行新增 `build_<项目>.py`、`probe_<项目>.py`、`replay_*.py` 或一套 README。临时诊断放目标项目的 `Saved/FaceMigration/Jobs/<任务>/Current/Temp/`；有复用价值的功能合入现有脚本。
+- `Characters/Seven/Evidence/` 为整理前历史数据，包括已有未提交修改，受 `preservation.manifest.json` 保护。其中旧绝对路径属于历史记录，不作为现行执行入口。历史 `.py` / `replay_*.py` 只用于追溯，禁止原样执行。
+- 新写入通过 `face_paths.output_path()`，新读取通过 `read_path()`。同任务当前输出优先于角色基准。源采样、参数、回归基准随角色保存一份；运行报告不得写回工具包。正式采纳新参数时才有意更新角色基准及摘要，不能自动覆盖历史证据。
+- 新任务输出位于目标项目 `Saved/FaceMigration/Jobs/<job_id>/Current/`。任务 ID / 角色 / 资产映射不能用于另一套目标后继续读取旧结果；换目标用独立 ID。
+- 当前报告使用固定文件名。成功的同步调用后，各备份组保留最近 3 份；显式 `archive` 保留最近 3 份归档。失败调用不自动清理。`.keep` 目录固定保留；未标记、名称不符的目录不清理。采样基准、`Imported` 和已有 `Saved/Codex` 不参与自动清理。
+- 修改前备份目标资产，保留原控制接口和执行链；采样无论成功或失败都恢复输入并读回。检查源对照、原控回归、正常帧预览和保存重载，不能把历史报告、编译或名称存在当作本次通过。
+- 默认按示例派生并结合 Max 适配：允许读取和复用用户指定的参考实现，保留其形状、配色、轨道、参考图、操作轴和行程。新角色重新绑定和核验数值；不默认全量重建或把所有点控裁到同一采样范围。示例与目标分开，已有目标按差异增量处理。
+- 外观和操作独立验收。数值、正常帧输出通过不等于控制设计合格；用户已指出外观差异时记录“视觉验收未通过”。只整理文档的任务不修改 UE / Max 资产。
+- `Scripts/ue-mcp.ps1` 仍是 DSH 规范脚本的副本；需要修改时先改 DSH 规范版本再同步。
+
+## 检查
+
+`python Tools/FaceMigration/migrate.py check` 校验链接、72 项映射、脚本语法及原始证据摘要，默认不写文件。
+
+`python -B -m unittest discover -s Tools/FaceMigration/Tests` 验证项目隔离、只读基准、任务配置、迁移路径与保留规则。它们不替代 UE 功能或用户画面验收。

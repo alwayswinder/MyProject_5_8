@@ -1,0 +1,23 @@
+{
+  "asset": "/Game/_MyTest/Mouth/Rig/NewControlRigRuntimeAsset",
+  "backup": "E:\\Unreal\\Projects\\_TEST\\MyProject_CR_5_8\\Saved\\Codex\\Backup\\CR58_BrowPoints_20261109_174734",
+  "captured_at": "20261109_174734",
+  "engine": "5.8.4-58902052+++UE5+Release-5.8",
+  "controls": [
+    "CTRL_BROW_L_IN",
+    "CTRL_BROW_L_MID",
+    "CTRL_BROW_L_OUT",
+    "CTRL_BROW_R_IN",
+    "CTRL_BROW_R_MID",
+    "CTRL_BROW_R_OUT"
+  ],
+  "nodes": 57,
+  "links": 78,
+  "cases": 18,
+  "stack_L_IN": [
+    5.0,
+    0.0,
+    10.0
+  ],
+  "saved": true
+}
