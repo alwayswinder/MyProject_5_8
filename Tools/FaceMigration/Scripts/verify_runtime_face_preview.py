@@ -14,15 +14,20 @@ import math
 from pathlib import Path
 import traceback
 import unreal
+from face_paths import PACKAGE_ROOT, context, runtime_path
+
+_preview_job = json.loads((PACKAGE_ROOT / 'Jobs' / (context().job_id + '.json')).read_text(encoding='utf-8-sig'))
+PREVIEW_HOST = _preview_job.get('preview', {}).get('host', 'asset_editor')
+assert PREVIEW_HOST in ('asset_editor', 'pie'), PREVIEW_HOST
 
 
 class RuntimeFaceFrameValidation:
     def __init__(self):
         self.root = Path(unreal.Paths.convert_relative_path_to_full(unreal.Paths.project_dir()))
-        self.out = _fm_tool('Docs/Evidence/SevenRuntime/preview_controls_validation.json')
+        self.out = _fm_output(_fm_tool('Docs/Evidence/SevenRuntime/' + ('pie_controls_validation.json' if PREVIEW_HOST == 'pie' else 'preview_controls_validation.json')))
         self.asset = unreal.load_asset(_fm_asset('/Game/_MyTest/Mouth/TMp/NewControlRigRuntimeAsset'))
         # 重开编辑器后旧 PreviewWorld 可能尚未回收；沿用已通过曲线检查的精确组件。
-        preview = json.loads((_fm_read(_fm_tool('Docs/Evidence/SevenRuntime/preview_morph_check.json'))).read_text(encoding='utf-8'))
+        preview = json.loads((_fm_read(_fm_tool('Docs/Evidence/SevenRuntime/' + ('pie_morph_check.json' if PREVIEW_HOST == 'pie' else 'preview_morph_check.json')))).read_text(encoding='utf-8'))
         assert preview['passed'] and not preview['pending']
         candidates = []
         for comp in unreal.ObjectIterator(unreal.SkeletalMeshComponent):
@@ -33,6 +38,7 @@ class RuntimeFaceFrameValidation:
                     candidates.append((comp, host))
         assert len(candidates) == 1, str(candidates)
         self.comp, self.live = candidates[0]
+        self.preview = preview
         self.h = self.live.get_hierarchy()
         self.temp = self.asset.get_editor_asset().create_rig_vm_host()
         self.temp.request_init()
@@ -65,6 +71,32 @@ class RuntimeFaceFrameValidation:
 
     def write(self):
         _fm_output(self.out).write_text(json.dumps(self.result, ensure_ascii=False, indent=2), encoding='utf-8')
+
+    def cleanup_owned_pie(self):
+        if PREVIEW_HOST != 'pie':
+            return
+        path = runtime_path('Evidence') / 'pie_preview_host.json'
+        if not path.is_file():
+            return
+        report = json.loads(path.read_text(encoding='utf-8'))
+        if not report.get('owns_pie') or report.get('target') != self.asset.get_path_name():
+            return
+        level = unreal.get_editor_subsystem(unreal.LevelEditorSubsystem)
+        level.editor_request_end_play()
+        report['cleanup_requested'] = True
+        path.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding='utf-8')
+        state = {}
+        def after_pie(delta):
+            if level.is_in_play_in_editor():
+                return
+            unreal.unregister_slate_post_tick_callback(state['handle'])
+            actors = unreal.get_editor_subsystem(unreal.EditorActorSubsystem)
+            for actor in unreal.ObjectIterator(unreal.SkeletalMeshActor):
+                if actor.get_path_name() == report['actor']:
+                    assert actors.destroy_actor(actor)
+            report.update(cleanup_complete=True, level_not_saved=True)
+            path.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding='utf-8')
+        state['handle'] = unreal.register_slate_post_tick_callback(after_pie)
 
     def qerror(self, a, b):
         aa, bb = (a.x,a.y,a.z,a.w), (b.x,b.y,b.z,b.w)
@@ -116,12 +148,23 @@ class RuntimeFaceFrameValidation:
             self.result['passed'] = self.result['passed'] and self.result['restored_input_error'] < 1e-6
             unreal.unregister_slate_post_tick_callback(self.handle)
             self.write()
+            if PREVIEW_HOST == 'pie':
+                worst = {name: max(row[name] for row in self.rows) for name in self.result['tolerance']}
+                report = dict(target=self.asset.get_path_name(), passed=self.result['passed'] and self.preview['passed'],
+                              host=self.comp.get_path_name(), controls_set=72, cases=len(self.rows),
+                              mesh_curves_equal_rig=worst['curve'] <= self.result['tolerance']['curve'],
+                              rig_clock_advancing=all(r['time_advanced'] for r in self.rows),
+                              result=worst, restored_input_error=self.result['restored_input_error'],
+                              captured_at=self.result['captured_at'])
+                (runtime_path('Evidence') / 'pie_preview_check.json').write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding='utf-8')
+                self.cleanup_owned_pie()
         except Exception:
             self.set_values(self.h, self.saved)
             self.live.execute('Forwards Solve')
             unreal.unregister_slate_post_tick_callback(self.handle)
             self.result.update(pending=False, passed=False, error=traceback.format_exc())
             self.write()
+            self.cleanup_owned_pie()
 
 
 _runtime_face_frame_validation = RuntimeFaceFrameValidation()

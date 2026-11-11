@@ -126,12 +126,25 @@ def main():
     source_bones = bone_transforms(source_hierarchy)
     target_bones = bone_transforms(target_hierarchy)
     drift = max(((max(abs(a - b) for a, b in zip(source_bones[n]['pos'], target_bones[n]['pos'])), n)
-                 for n in source_bones), default=(0.0, ''))
+                 for n in source_bones if n in target_bones), default=(0.0, ''))
+    # Binding equivalence is independent of the presence of authored controls.
+    # An empty runtime shell is expected to have none of the reference controls.
+    common = set(source_bones) & set(target_bones)
+    rotation_drift = max((min(
+        max(abs(a-b) for a,b in zip(source_bones[n]['rot'], target_bones[n]['rot'])),
+        max(abs(a+b) for a,b in zip(source_bones[n]['rot'], target_bones[n]['rot'])))
+        for n in common), default=0.0)
+    scale_drift = max((max(abs(a-b) for a,b in zip(source_bones[n]['scale'], target_bones[n]['scale']))
+                       for n in common), default=0.0)
+    reference_mesh = source.get_preview_mesh()
     binding = {
         'bone_names_equal': [str(b.name) for b in source_hierarchy.get_bones()] == [str(b.name) for b in target_hierarchy.get_bones()],
         'bone_count_reference': reference['bones'], 'bone_count_target': target_before['bones'],
         'max_bone_position_drift_cm': round(float(drift[0]), 8), 'max_bone_position_drift_bone': drift[1],
         'mesh': str(mesh), 'mesh_morphs': mesh_morphs,
+        'same_preview_mesh': mesh == reference_mesh,
+        'max_bone_rotation_quaternion_drift': rotation_drift,
+        'max_bone_scale_drift': scale_drift,
         'reference_curves_not_in_mesh': sorted(set(reference['curve_names']) - set(morphs)),
         'curves_only_in_reference': sorted(set(reference['curve_names']) - set(target_before['curve_names'])),
         'curves_only_in_target': sorted(set(target_before['curve_names']) - set(reference['curve_names'])),
@@ -142,8 +155,10 @@ def main():
     }
     equivalent = (binding['bone_names_equal'] and binding['bone_count_reference'] == binding['bone_count_target']
                   and binding['max_bone_position_drift_cm'] < DRIFT_LIMIT_CM
+                  and binding['same_preview_mesh']
+                  and rotation_drift < 1e-6 and scale_drift < 1e-6
                   and not binding['reference_curves_not_in_mesh']
-                  and not binding['reference_controls_not_in_target'])
+                  )
     if not equivalent:
         route = 'rebind_and_refit'
     elif not binding['target_has_solver']:

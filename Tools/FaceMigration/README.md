@@ -88,6 +88,14 @@ python Tools/FaceMigration/migrate.py run probe_cr_migration.py --engine-root E:
 python Tools/FaceMigration/migrate.py run build_lip_controls.py --job seven-runtime --dry-run
 ```
 
+正常帧验证可使用任务配置 `"preview": {"host": "pie", "prepare": true}`：
+`probe_runtime_face_morph_preview.py` 在目标同名 `_UI/` 目录创建带 owner 标记的
+`ABP_FacePreview`，添加临时关卡网格并启动模拟，先测 28 条 Morph。
+等本任务 `SevenRuntime/pie_morph_check.json` 的 `pending=false` 且 `passed=true`，
+再运行 `verify_runtime_face_preview.py` 测 72 个控制、组合与恢复，共 75 组。
+后者完成后关闭工具启动的 PIE 并移除临时 Actor，不保存用户关卡。
+没有此配置时仍检查资产编辑器预览；两类报告分开保存。已有用户 PIE 时不接管。
+
 `UE_ENGINE_ROOT` 环境变量也可指定引擎。多个 UE 实例用 `--project` 和 `--node-id` 精确定位。`run --offline` 用于普通 Python 拟合脚本；先把本次原始采样放入对应任务的 `Current/Temp/`。NumPy / SciPy 等拟合依赖需要另外安装。
 
 例如生成本任务的采样骨名单：`python Tools/FaceMigration/migrate.py run fit_cheek_controls.py --offline --job seven-local --script-arg=--prepare`。
@@ -102,6 +110,12 @@ pwsh -File Tools/FaceMigration/Scripts/max_run.ps1 -ScriptFile probe_mouth_sampl
 若通过 Max MCP 直接执行采样内容，应先从对应任务配置设置 `FaceMigrationTempDir`；需要加载指定源场景时同时设置 `FaceMigrationSourceScene`。否则使用上面的客户端入口，避免沿用另一任务的 Max 全局变量。
 
 既有脚本的首次构建、增量修改、重建限制仍有效。不要对已建好的资产整段重放所有 `build_*`。内置的 RuntimeAsset 适配层只转发 API，不将临时 host 当作实际预览，也不伪造 Blueprint 编译状态。整图迁移/对照脚本需要保留独立源资产，不能把源和目标映射成同一个包。
+
+滑块手柄默认比滑轨向前浮起 **1 cm**（Seven 为局部 +Y）；滑轨使用 **不透明、正常深度测试的实体辅助形状**，线宽 0.12 cm，关闭原置顶调试线。仅前移不能修复调试线覆盖拾取区域的问题。生成器与显示验证器共用 `Scripts/slider_handle_layout.py`，保留 72 个动画接口与求解；新增的 `VIS_SLIDER_RAILS` 只作不可操作的 Visual Cue。生成依赖在 `<目标 Rig 包名>_UI/`，迁移时一并携带。已有目标用 `migrate.py run update_slider_handle_depth.py --job <任务>` 增量修复，详见[拾取间距规则](Docs/Workflow/Build.md#滑块与滑轨的拾取间距)。
+
+口型参考图默认收近到滑轨后方 **1 cm**；Seven 为图形 Y=17、滑轨 Y=18、手柄中心 Y=19。新建与增量修复共用此规则，旧版轨道后方 6 cm 的布局只作历史记录。
+
+2026-11-11 按用户明确要求，同样的布局已同步到原始示例 `CR_Seven_LidWorldRotation`，配置为 `Jobs/seven-reference-layout-20261111.json`；示例依赖在其同名 `_UI/` 目录。普通迁移仍只读示例，后续用新任务读取更新后的示例摘要，历史报告保留原值。
 
 迁移后单独比较示例的控制设计、Max 的动作及目标正常帧输出。控制数、骨骼数或曲线数相同不代表滑轨、口型图和手感完整。先检查代表性小组的外观与操作，再扩大数值采样；未确认和用户已拒绝的视觉状态分开记录。只整理文档时不运行资产修改。
 

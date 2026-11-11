@@ -16,7 +16,7 @@
 | 4 | 迁移对照 + 显示契约 + 部位验证器分段 | `migrate.py run verify_runtime_face_controls.py --job <任务>` | `SevenRuntime/before_reload/summary.json`、`layout_validation.json` |
 | 5 | Max 抽检一个代表控制 | `migrate.py run crosscheck_max_control.py --job <任务>` | `max_crosscheck_<name>.json` + `_max.json`（Max 原始采样） |
 | 6 | 保存、关闭、重载、复验、收尾状态 | `migrate.py run finalize_runtime_face_controls.py --job <任务>` | `reload_report.json`、`final_state.json` |
-| 7 | 正常帧预览（必要时刷新一次） | `migrate.py run probe_runtime_face_morph_preview.py --job <任务>`；停滞再跑 `refresh_runtime_face_preview.py` | `SevenRuntime/preview_morph_check.json`（含 `stall_diagnosis`） |
+| 7 | 正常帧预览（必要时刷新一次） | `migrate.py run probe_runtime_face_morph_preview.py --job <任务>`；停滞再跑 `refresh_runtime_face_preview.py` | `SevenRuntime/preview_morph_check.json`（含 `stall_diagnosis`）；资产编辑器不 tick 时另用关卡 + AnimBlueprint + PIE 取证，写 `pie_preview_check.json` |
 | 8 | 汇总分段结论 | `migrate.py run assemble_delivery.py --job <任务> --offline` | `validation.json`、`delivery_check.json` |
 
 要点：
@@ -92,7 +92,8 @@ UE 远程节点不可用时，继续做离线资料检查并明确未进行实�
 | 下巴 UI 行程缩为 1/3 | `resize_chin_travel.py` | 已缩放；拒绝重复缩放，动画旧值 / 增益需对应处理 |
 | 表情在画面右侧、向右增加 | `update_expression_slider_layout.py` | 当前已应用；按角色和当前布局核对 |
 | 眼神在画面左侧靠近角色 | `update_eye_expression_layout.py` | 当前已应用；同步轨道和手柄 |
-| 参考图在滑块后方 | `update_phoneme_reference_depth.py` | 当前 Seven 已后移 6 cm；新角色重新定尺度 |
+| 参考图贴近滑轨后方 | `update_phoneme_reference_depth.py` | 共用布局入口，默认轨道后方 1 cm；Seven 图形 Y=17、轨道 Y=18、手柄中心 Y=19，不再沿用旧版 6 cm |
+| 手柄在轨道前方，便于拾取 | `update_slider_handle_depth.py` / `slider_handle_layout.py` | shape 局部 +Y=1 cm；旧置顶调试线关闭，改为线宽 0.12 cm 的不透明、遵守深度测试的实体 Visual Cue；生成和验证共用此规则，见 [布局规则](Build.md#滑块与滑轨的拾取间距) |
 | Morph 层级曲线有值、预览暂未收到 | `refresh_expression_preview.py` / `refresh_phoneme_preview.py` / `refresh_eye_expression_preview.py` | 保留输入重开预览，正常动画帧后检查；眼神结束采样另用 `finish_eye_expression_preview.py` 检查恢复 |
 
 ## 示例派生与新式资产迁移入口

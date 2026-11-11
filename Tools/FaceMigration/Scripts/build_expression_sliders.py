@@ -11,6 +11,7 @@ _fm_sys.dont_write_bytecode = True
 import datetime,json,shutil,types
 from pathlib import Path
 import unreal
+from slider_handle_layout import apply_slider_layout
 ROOT=Path(unreal.Paths.convert_relative_path_to_full(unreal.Paths.project_dir()));E=_fm_tool('Docs/Evidence/ExpressionSliders')
 b=types.ModuleType('chin');exec(compile((_fm_read(_fm_tool('Scripts/build_chin_control.py'))).read_text(encoding='utf-8'),'chin','exec'),b.__dict__)
 ASSET=b.ASSET
@@ -63,6 +64,7 @@ def main():
                 default(rail+'.Color','(R=%.4f,G=%.4f,B=%.4f,A=1)'%tuple(v*.55 for v in row['color'][:3]));default(rail+'.Thickness',.8)
                 link(tail,rail+'.ExecutePin');expected.append((tail,rail+'.ExecutePin'));tail=rail+'.ExecutePin'
             assert sorted(b.base.base.helper.exec_links(model))==sorted(expected)
+            apply_slider_layout(rig)
             rig.recompile_vm();assert rig.get_editor_property('status')!=unreal.BlueprintStatus.BS_ERROR
     finally:rig.set_auto_vm_recompile(auto)
     report.update(nodes_after=len(model.get_nodes()),controls_after=len(h.get_controls()),expected_execution_links=expected,regression_cases=len(cases))

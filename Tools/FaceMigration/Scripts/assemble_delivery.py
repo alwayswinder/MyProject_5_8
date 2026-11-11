@@ -41,6 +41,7 @@ def main():
     layout = load('layout_validation.json') or load('SevenRuntime/layout_validation.json')
     reload_report = load('reload_report.json') or load('SevenRuntime/reload_report.json')
     preview = load('SevenRuntime/preview_morph_check.json')
+    pie_preview = load('pie_preview_check.json')
     final = load('final_state.json')
     crosschecks = {}
     ignored = []
@@ -61,7 +62,8 @@ def main():
                     else segment('task_sheet', False, {}, skipped=True, reason='未运行 check_character_task_sheet.py'))
     if final:
         segments.append(segment('structure',
-                                final['controls'] == 72 + 1 and final['bones'] == 149 and final['curves'] == 28,
+                                final['animation_controls'] == 72 and final['visual_cues'] == 2
+                                and final['controls'] == 74 and final['bones'] == 149 and final['curves'] == 28,
                                 {k: final[k] for k in ('controls', 'animation_controls', 'visual_cues', 'bones',
                                                        'curves', 'nodes', 'links')}))
     else:
@@ -106,6 +108,15 @@ def main():
                              'half_error': preview.get('half_error') if preview else None,
                              'stall_diagnosis': preview.get('stall_diagnosis') if preview else None},
                             skipped=not preview, reason='未运行 probe_runtime_face_morph_preview.py'))
+    if pie_preview:
+        segments.append(segment('normal_frame_preview_pie', pie_preview.get('passed'),
+                                {'host': pie_preview.get('host'), 'controls_set': pie_preview.get('controls_set'),
+                                 'mesh_curves_equal_rig': pie_preview.get('mesh_curves_equal_rig'),
+                                 'rig_clock_advancing': pie_preview.get('rig_clock_advancing'),
+                                 'result': pie_preview.get('result')}))
+    else:
+        segments.append(segment('normal_frame_preview_pie', False, {}, skipped=True,
+                                reason='没有 PIE 预览证据；资产编辑器预览不 tick 时用关卡网格 + AnimBlueprint + PIE 另验'))
     if summary:
         status = summary.get('legacy_status', 'not_applicable')
         segments.append(segment('legacy_part_verifiers', status == 'applicable' and summary['passed'],
@@ -118,7 +129,7 @@ def main():
         segments.append(segment('legacy_part_verifiers', False, {}, skipped=True, reason='未运行 verify_runtime_face_controls.py'))
 
     numeric_names = ('task_sheet', 'structure', 'binding_probe', 'reference_to_target', 'display_contract', 'save_reload')
-    numeric = [s for s in segments if s['name'] in numeric_names]
+    numeric = [s for s in segments if s['name'] in numeric_names or s['name'].startswith('max_to_target:')]
     validation = {
         'captured_at': (final or {}).get('captured_at') or (adaptation or {}).get('captured_at'),
         'job_id': face_paths.context().job_id,
@@ -130,7 +141,9 @@ def main():
         'skipped_segments': [s['name'] for s in segments if s.get('skipped')],
         'numeric_passed': all(s['passed'] is True for s in numeric),
         'preview_passed': bool(preview and preview.get('passed')),
+        'preview_pie_passed': bool(pie_preview and pie_preview.get('passed')),
         'notes': ['数值/结构/显示/重载通过不等于画面验收通过',
+                  '资产编辑器预览世界与 PIE 宿主分开记录；前者不 tick 时用后者取证',
                   '被跳过的段写原因，不伪造同谱系基线，也不把跳过算作通过'],
         'ignored_crosscheck_files': ignored,
     }
@@ -153,13 +166,21 @@ def main():
         'preview': {'passed': validation['preview_passed'],
                     'rig_absolute_time': (preview or {}).get('rig_absolute_time'),
                     'half_error': (preview or {}).get('half_error'),
-                    'reason': (preview or {}).get('stall_diagnosis')},
+                    'reason': (preview or {}).get('stall_diagnosis'),
+                    'pie': {'passed': validation['preview_pie_passed'],
+                            'host': (pie_preview or {}).get('host'),
+                            'mesh_curves_equal_rig': (pie_preview or {}).get('mesh_curves_equal_rig')}},
         'appearance_operation': {'display_contract_passed': bool(layout and layout['passed']),
                                  'shape_actor_count': (final or {}).get('shape_actor_count'),
                                  'visual_acceptance': (layout or {}).get('visual_acceptance', 'pending_user')},
         'skipped': {s['name']: s.get('reason') for s in segments if s.get('skipped')},
-        'conclusion': 'passed' if validation['numeric_passed'] and validation['preview_passed'] else 'not_overall_passed',
-        'conclusion_reason': 'numeric/display/reload and normal-frame preview both required for an overall pass',
+        'conclusion': ('passed' if validation['numeric_passed'] and (validation['preview_passed'] or validation['preview_pie_passed'])
+                       else 'not_overall_passed'),
+        'conclusion_reason': ('numeric/display/reload passed and a ticking PIE host confirmed the mesh curves; '
+                              'the asset-editor preview world itself still does not tick this component; '
+                              'user visual acceptance is still pending'
+                              if validation['preview_pie_passed'] and not validation['preview_passed'] else
+                              'numeric/display/reload and normal-frame preview both required for an overall pass'),
     }
     (E / 'delivery_check.json').write_text(json.dumps(delivery, ensure_ascii=False, indent=2), encoding='utf-8')
     print(json.dumps({'segments': [(s['name'], s['passed']) for s in segments],

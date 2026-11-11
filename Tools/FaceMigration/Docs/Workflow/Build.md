@@ -107,6 +107,28 @@
 
 先选眉毛或眼皮一组、一个水平滑块及视线总控，检查复用路线、比例、操作轴和重置，再应用到其余组。用户已给出明确示例时按示例推进，不要求每组再次批准；已有明确负面反馈必须修正。
 
+### 滑块与滑轨的拾取间距
+
+滑块手柄必须在滑轨前方，不能共面。默认沿面板朝向前移 **1 cm**；Seven 面板朝局部 **+Y**，轨道在 Y=18 cm，手柄中心在 Y=19 cm，约 1 cm 直径的球体后缘距轨道约 0.5 cm。口型参考图继续在轨道后方。新角色按面板朝向和头部尺度适配，检查中性、中间、端点和头部跟随时的前后层次。
+
+**口型图只在轨道后方 1 cm**，不再沿用旧版 6 cm 的大间距。当前 Seven 三层为：参考图 Y=17、滑轨 Y=18、手柄中心 Y=19 cm。参考图仅改 Initial/Current shape translation，保留辅助控制原 offset（Y=12）、X/Z、逐行对齐和图形比例；重复执行使用绝对目标，不累加。该规则与滑轨共同由 `apply_slider_layout()` 应用，新建参考图的部位入口也会调用 `apply_reference_depth()`。单独修复已有目标可运行 `migrate.py run update_phoneme_reference_depth.py --job <任务>`，复用同一备份、保存重载及回归检查。
+
+手柄间距只修改 **shape transform**，Initial 和 Current 都写入相同的局部 Y 绝对偏移；保留控制 offset、输入轴、0–8 行程、限位、增益和求解。不能为了拉开间距修改控制输入的 Y 值，也不能重复运行时累加偏移。示例若仍为共面布局，目标有意修正此项，示例资产保持不变。
+
+**仅前移不足以修复拾取遮挡。** 2026-11-11 用户反馈重叠区域仍无法选择；实测当前手柄使用 `ControlRigGizmoMaterial`（Opaque、Depth Test 开启），并非半透明 X-Ray 材质。滑轨原用 `Draw Line Strip`，此安装的 `URigVMHost::DrawIntoPDI` 将线段硬编码为 `SDPG_Foreground`；即使改节点的 `DebugDrawSettings.DepthPriority` 也不能依赖其生效。前景调试线会覆盖手柄的画面与拾取区域。
+
+默认生成将轨道改为 **Opaque、Unlit、Depth Test 开启**的实体网格，保持原轨道坐标、端点、行序和分组颜色，线宽 **0.12 cm**。旧 24 条调试轨道仅设 `bEnabled=False`，保留节点和全部执行连接。新增一个 `VIS_SLIDER_RAILS`（Visual Cue，不可操作），72 个动画接口不变；当前 Seven 因此为 **74 控制 = 72 动画控制 + 2 Visual Cue**。轨道继承滑块的父空间；形状库的普通材质和 X-Ray 材质均使用同一不透明轨道材质。
+
+共用实现为 `Scripts/slider_handle_layout.py`（`HANDLE_FORWARD_CM=1.0`、`RAIL_WIDTH_CM=0.12`）。`build_runtime_face_controls.py` 和三个表情/口型部位构建器自动调用 `apply_slider_layout()`，同时处理手柄间距与轨道几何。生成依赖为 `<目标 Rig 包名>_UI/` 下的 `M_SliderRails`、`SM_SliderRails`、`SL_SliderRails`；迁移 Rig 时携带这些资产。已有资源必须有本工具的 owner 元数据才允许更新；重复运行复用资源，不叠加轨道。`verify_runtime_face_controls.py` 单列间距和新增 Visual Cue 的有意差异，检查轨道不透明、深度测试及旧调试线关闭。已有目标只运行增量修复，不重建：
+
+```powershell
+python Tools/FaceMigration/migrate.py run update_slider_handle_depth.py --job <任务>
+```
+
+该入口备份目标磁盘包、内存状态、图文本及预览输入，检查原动画接口、控制 offset、节点和连接不变，图默认值仅允许原轨道的 `bEnabled=False`；保存重载后复验并恢复输入。已有生成依赖同样备份。报告为本任务 `Current/Evidence/slider_handle_depth.json`；本轮实际预览实例与材质检查见 `slider_picking_validation.json`。像素拾取与实际手感仍由用户验收，不能把结构或数值通过当作拾取已获确认。
+
+2026-11-11 用户明确授权将这些改动同步回原始 Blueprint 示例，已用独立配置 `Jobs/seven-reference-layout-20261111.json` 完成。共用修复入口支持 Blueprint / RuntimeAsset；可选 `layout.target` 指定实际修改资产，`layout.readonly_asset` 指定只读对照，两者必须不同。普通任务省略这两项时仍修改 RuntimeAsset、保持示例只读。本次示例现有 74 个控制（72 动画控制 + 2 Visual Cue）；空目标构建器兼容此辅助控制，并为目标生成自己的轨道库，避免复制后两个同名库解析到示例资源。后续迁移重新盘点更新后的示例摘要，不覆盖旧任务的摘要证据。
+
 按源依赖处理眉眼、嘴唇、脸颊、鼻子、嘴控、视线、下巴和 Morph。共享骨骼先合成贡献，保留旋转和枢轴顺序；执行链保持可达，避免后写覆盖。继承完整图时不必为遵守搭建顺序拆掉重建。
 
 ### 外观和操作是必交内容

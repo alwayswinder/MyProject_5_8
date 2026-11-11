@@ -27,21 +27,44 @@
 
 环境被重置为新的空壳目标 `/Game/_MyTest/Mouth/TMp/NewControlRigRuntimeAsset`（149 骨、0 控制、87 曲线、1 节点），上一轮的 `...Asset1` 已删除。本轮从 TASK.md 第 1、2 节重新生成配置 `Jobs/seven-taskflow-20261110.json`，走完读表 → 备份盘点 → 独立探测 → 空目标构建 → 三方验证 → 保存重载 → 正常帧预览。结论与上一轮一致：结构、数值、显示、重载通过；正常帧预览仍停滞（0.4 s，两次 refresh 无效）；12 个部位验证器 2/12（旧控回归谱系不符）。新增发现：任务单表格对齐格式会让解析正则失效、形状库 struct 只有 `shape_name` 可读、手动 `execute('Forwards Solve')` 能出 rig 曲线但 mesh 曲线仍 0、保存后目标不 dirty（上一轮记录的“必然重新 dirty”不成立）、Max 次级眼皮骨有 0.021 cm / 0.41° 的差异。报告在 `Saved/FaceMigration/Jobs/seven-taskflow-20261110/Current/Evidence/`，问题清单 `flow_findings.md`。
 
+## 2026-11-11 指定目标重新完成
+
+本轮任务 `seven-complete-20261111` 重新盘点时，用户指定的 `NewControlRigRuntimeAsset`
+实际为空壳（0 控制、1 节点、149 骨、87 曲线）。独立核对同一预览网格、骨骼顺序、
+初始位移/旋转/缩放和 Morph 依赖后，按更新后的示例重新派生；未改动示例。
+构建为 72 动画控制 + 2 Visual Cue、149 骨、28 曲线、1926 节点、2639 连接。
+保存前后各 1175 组示例对照与显示契约通过。Max 本轮重新核对全部 72 个名称的唯一性，
+只重采右上眼皮五点：主骨误差 0.00343985 cm / 0.00059242°；次级骨 Bone027
+仍有 0.0208485 cm / 0.39335415° 的已知差异。其余控制继承示例，未全量重新拟合。
+最终正常帧、恢复与交付结论以本任务 `Current/Evidence/delivery_check.json` 为准，
+不沿用旧任务通过状态。用户画面与拾取手感仍待验收。
+本轮 PIE 的 28 条 Morph 半程/恢复检查及全部 75 组逐帧控制测试均已通过；
+网格骨骼最大差 7.2683e-8 cm / 2.4148e-6°，最终曲线及输入恢复误差为 0。
+资产编辑器自身的预览仍停在 0.4 s，单列未通过；PIE 已结束，临时测试 Actor 已移除，用户关卡未保存。
+
 ## 当前资产
+
+2026-11-11 用户明确要求把上述布局同步回原始示例 `CR_Seven_LidWorldRotation`，已通过独立任务 `seven-reference-layout-20261111` 完成：24 个手柄前移 1 cm，实体滑轨线宽 0.12 cm，口型图位于轨道后方 1 cm；示例当前同样为 72 动画控制 + 2 Visual Cue，149 骨 / 28 曲线 / 1926 节点 / 2639 连接。原控制 offset、输入、节点和连接保持，旧调试轨道仅关闭绘制；1175 组示例与 RuntimeAsset 对照差异全 0，已保存重载。独立依赖在 `/Game/_MyTest/Mouth/LidDiagnostic/CR_Seven_LidWorldRotation_UI/`。RuntimeAsset 本次作为只读对照，包摘要未变；旧任务记录的示例摘要属于更新前快照，不改写历史报告，后续迁移用新任务重新盘点。此次是用户对“默认示例只读”规则的明确例外；普通迁移仍保持示例只读。
+
+2026-11-11 后续按用户反馈进一步收近口型图：显示平面从 Y=12 改为 Y=17，距 Y=18 滑轨后方 1 cm；手柄中心仍 Y=19。仅改参考图 Initial/Current shape 局部 Y=5，原辅助控制 offset、X/Z、图形大小、逐行对齐和所有动画接口保持。保存重载及 1175 组迁移对照通过，原骨骼、曲线、控制位置误差均为 0。共用生成、单独参考图生成及验证规则均已同步；当前间距见任务报告 `slider_handle_depth.json` 的 `phoneme_reference_depth`。
+
+2026-11-11 首次将 24 个手柄的 Initial/Current shape 局部 +Y 设为 1 cm（轨道 Y=18，手柄中心 Y=19），数值与重载通过，但用户随后反馈重叠区域仍无法选择，故该次拾取修复**未通过用户验收**。进一步实测：当前手柄实际为 Opaque，半透明 X-Ray 材质未使用；原调试滑轨被引擎按前景置顶绘制，单独加深度间距不足。
+
+同日后续修复：保留手柄 1 cm 间距，把 24 条滑轨改成不透明、正常深度测试的实体网格，线宽 0.12 cm，保留坐标、端点和分组配色；原轨道节点仅设 `bEnabled=False`，节点和全部连接保持。增加不可操作的 `VIS_SLIDER_RAILS`，当前为 **74 控制 = 72 动画控制 + 2 Visual Cue**，149 骨 / 28 曲线 / 1926 节点 / 2639 连接。依赖在 `/Game/_MyTest/Mouth/TMp/NewControlRigRuntimeAsset_UI/`，随 Rig 迁移。保存重载及 1175 组对照通过，骨骼、曲线、原控制位置误差均为 0，示例磁盘包未改动，资产与预览输入已恢复。当前预览已读到新实体轨道和 Opaque 材质，重复执行不叠加；像素拾取与手感仍待用户实际验收。生成器、任务单和验证共用新规则。报告为当前任务 `Current/Evidence/slider_handle_depth.json`、`slider_picking_validation.json`。资产编辑器原有非 tick 宿主问题另按预览章节记录。
 
 | 项目 | 路径 / 状态 |
 |---|---|
 | Max 源场景 | `D:/Download/Seven_Skin_New.max`，采样帧 0 |
 | UE 网格 | `/Game/_MyTest/Mouth/Mesh/Seven`，历史核对 149 骨、87 个 Morph Target |
-| 当前输出目标 | `/Game/_MyTest/Mouth/TMp/NewControlRigRuntimeAsset`，类型 `ControlRigRuntimeAsset`；2026-11-10 第二轮由空壳构建，149 骨、72 动画控制 + 1 Visual Cue、28 曲线、1926 节点/2639 连接，已保存重载；正常帧预览未通过，画面待用户验收 |
+| 当前输出目标 | `/Game/_MyTest/Mouth/TMp/NewControlRigRuntimeAsset`，类型 `ControlRigRuntimeAsset`；149 骨、72 动画控制 + 2 Visual Cue、28 曲线、1926 节点/2639 连接；2026-11-11 改为正常深度测试的实体滑轨，已保存重载；像素拾取和画面待用户验收 |
 | 历史输出目标 | `/Game/_MyTest/Mouth/TMp/NewControlRigRuntimeAsset1`，2026-11-10 第一轮流程验证的对象；**该资产已不在磁盘**，相关报告只作历史记录 |
-| 本轮示例 Rig | `/Game/_MyTest/Mouth/LidDiagnostic/CR_Seven_LidWorldRotation`；允许参考与复用，示例保持不变 |
+| 本轮示例 Rig | `/Game/_MyTest/Mouth/LidDiagnostic/CR_Seven_LidWorldRotation`；2026-11-11 按用户明确要求同步最新布局，72 动画控制 + 2 Visual Cue；普通迁移时仍只读 |
 | 完整名称与输入表 | [Seven.face-controls.json](face-controls.json)，72 项 |
 | 2026-11-09 历史结构 | 149 骨、72 个动画控制 + 1 个参考图 Visual Cue、1926 节点、28 条 Morph 曲线；不作为当前盘点 |
-| 当前保存结构 | 149 骨、72 个动画控制 + 1 个参考图 Visual Cue、9804 节点；层级保留网格的 87 条 Morph 曲线，其中面部接口驱动 28 条；24 条滑轨随头部运动 |
+| 当前保存结构 | 本轮 149 骨、72 动画控制 + 2 Visual Cue、1926 节点、2639 连接、28 输出曲线；实体轨道和口型参考图保留 |
 | 2026-11-10 流程测试记录 | 72 个动画控制、9166 节点、28 条 Morph；2846 组源姿势、保存重载及 79 组正常帧测试有数值通过记录，但未迁入完整示例控制设计及口型参考图 |
-| 当前运行报告位置 | 目标项目 `Saved/FaceMigration/Jobs/seven-taskflow-20261110/Current/Evidence/`（含 `flow_findings.md`、`reference_inventory.json`、`adaptation_report.json`、`layout_validation.json`、`validation.json`、`delivery_check.json`）；任务配置 `Jobs/seven-taskflow-20261110.json`。上一轮 `seven-newchar-20261110` 保留为历史 |
-| 当前 Max 对照 | 517 组本轮采样，含完整 UI 行程、中间值、全脸组合及脸颊阈值两侧；保存重载前后均通过，最大配准姿势误差约 0.0034 mm / 0.0012°，28 条曲线误差约 1.31e-6 |
+| 当前运行报告位置 | `Saved/FaceMigration/Jobs/seven-complete-20261111/Current/Evidence/`；任务配置 `Jobs/seven-complete-20261111.json`。此前任务报告保留为历史 |
+| 历史 Max 对照 | 先前增量采样资产的 517 组配准姿势，覆盖完整 UI 行程、组合与脸颊阈值；不作为本轮重新采样或验收结论 |
 | 当前显示对照 | 73 项形状、颜色、限位、行程、初始 offset 与 shape transform 无差异；两个形状库及 24 条滑轨的参考点/颜色/粗细一致，控制和滑轨适配为头部跟随 |
 | 历史运行环境 | UE 5.8.4 / CL 58902052；旧配方的 5.8.3 是历史环境，执行时重新发现 |
 | 2026-11-09 历史结构及功能依据 | [历史重载](Evidence/SevenRuntime/reload_report.json)、[1175 组迁移对照](Evidence/SevenRuntime/after_reload/transfer_validation.json)、[12 组源样本验证器](Evidence/SevenRuntime/after_reload/source_verifiers.json) |

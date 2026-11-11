@@ -129,6 +129,8 @@ assert (closed.translation - baseline.translation).length() > 0.01, '目标骨�
 
 2026-11-10 第二轮在重建的 `NewControlRigRuntimeAsset` 上完全复现（时钟 0.4 s、`half_error=0.50014`、两次 refresh 无效），并补到一段更细的判定：在**同一个 live preview host** 上手动 `host.execute('Forwards Solve')` 后 Rig 层级曲线变成正确的 `0.50014`，而网格的动画曲线仍为 0。随后进一步确认：`host.set_absolute_time(1.0)` 能改时间，但 4 秒后仍为 1.0，激活编辑器窗口也无效——**组件根本没有被 tick**。所以可以确认的只有“预览 tick 不推进”这一层；“曲线没传给网格”目前无法单独证明（动画实例同样没被 tick）。`request_run_once_event('Forwards Solve')` 对该预览 host 无效，`request_evaluate()` 在 `ControlRig` 上不存在。记录时应写成“预览世界不 tick”，不要写成曲线绑定或求解错误。该判定已并入 `probe_runtime_face_morph_preview.py`：`half_error` 超阈值时自动写 `stall_diagnosis.verdict`（`solver_runs_but_mesh_curves_stale` / `solver_did_not_run` / `curves_transfer_partial`）。
 
+**改用 ticking 宿主后一次通过（2026-11-10）**：不要继续重开资产编辑器刷状态。在关卡里放网格并挂含 ControlRig Layer 的 AnimBlueprint（或 ControlRig Actor 的 mapped mesh），进 PIE 后设控制、逐条比较网格曲线与 Rig 曲线。实测 `L_SevenLipSync` + `NewAnimBlueprint` + PIE：Rig 时钟从 0 推进到 105 s，5 个控制驱动后网格曲线与 Rig 曲线逐条误差 0（`Seven_Head_huangzhang`/`Seven_Pupil_huangzhang` = `0.50014`），骨骼输出与独立实例一致。证据 `pie_preview_check.json`。交付里两段分开写：`normal_frame_preview`（资产编辑器，仍不通过）与 `normal_frame_preview_pie`（PIE 宿主，通过）。
+
 Max 抽检要按骨分别报数。2026-11-10 第二轮实测同一控制（`CTRL_EYE_LID_R`）下，主驱动骨 `Bone028` 误差 0.00344 cm / 0.0808°（约等于 6 位小数四元数量化下限），而 Link_Constraint 的次级骨 `Bone027` 在中间行程有 0.0208 cm / 0.4076° 的差异，两端趋零。只报整体 worst 会把这类差异藏起来；容差要按驱动关系区分并写明量化下限。轴向换算（本轮实测）：Max → UE 位置 `(x, -y, z)`、四元数 `(x, -y, z, w)`。
 
 ## 6. 证据保存

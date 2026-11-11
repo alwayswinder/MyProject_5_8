@@ -72,7 +72,7 @@ def bootstrap(script, project, config):
         f'_fm_scripts = {str(PACKAGE_ROOT / "Scripts")!r}',
         'if _fm_scripts in sys.path: sys.path.remove(_fm_scripts)',
         'sys.path.insert(0, _fm_scripts)',
-        'for _fm_name in ("face_paths", "runtime_compat"): sys.modules.pop(_fm_name, None)',
+        'for _fm_name in ("face_paths", "runtime_compat", "slider_handle_layout", "verify_runtime_face_controls", "update_slider_handle_depth"): sys.modules.pop(_fm_name, None)',
         'import face_paths',
         f'face_paths.configure(project={str(project)!r}, config={config!r})',
         'import unreal',

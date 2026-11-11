@@ -135,9 +135,11 @@
    `probe_lip_samples.ms`、`probe_cheek_samples.ms`、`probe_mouth_samples.ms`、`probe_nose_samples.ms`、`probe_nose_side_samples.ms`、`probe_chin_samples.ms`、`probe_eyeball_samples.ms`、`probe_gaze_master_samples.ms`、`probe_xyp_samples.ms`、`probe_expression_sliders.ms`、`probe_phoneme_sliders.ms`、`probe_eye_expression_sliders.ms`，眉毛与上眼皮另改 `probe_animcraft_*.ms`、`probe_syp*.ms` 里的对象名与骨骼名。
    这些脚本目前不读 `face-controls.json`，所以必须同步改；改完先用 `-DryRun` 检查将发送的代码。
 4. **探测与判定**：按 [Build.md](Docs/Workflow/Build.md) 第 1~3 节执行：独立探测目标骨架/网格/Morph，写 `reference_inventory.json`、`adaptation_report.json`；判定“等价核对”还是“重新绑定”。
-5. **构建与验证**：空目标用 `build_runtime_face_controls.py`，非空走增量；随后 `verify_runtime_face_controls.py`、保存重载、正常帧预览。报告写到 `Saved/FaceMigration/Jobs/<job_id>/Current/Evidence/`；原始采样与回归快照写到 `Saved/FaceMigration/Characters/<角色>/`，不要写回工具包。
+5. **构建与验证**：空目标用 `build_runtime_face_controls.py`，非空走增量；随后 `verify_runtime_face_controls.py`、保存重载、正常帧预览。滑块手柄须比滑轨向前浮起 1 cm（Seven：Initial/Current shape 局部 +Y=1），并关闭原置顶调试轨道，改用不透明、正常深度测试的实体 Visual Cue（线宽 0.12 cm，新增 `VIS_SLIDER_RAILS`，动画接口不变）。沿用示例时同样应用，不能改控制 offset 或输入值；共用 `slider_handle_layout.py` 的 `apply_slider_layout()`，已有目标用 `update_slider_handle_depth.py`，生成依赖 `<目标 Rig 包名>_UI/` 随 Rig 迁移。报告写到 `Saved/FaceMigration/Jobs/<job_id>/Current/Evidence/`；原始采样与回归快照写到 `Saved/FaceMigration/Characters/<角色>/`，不要写回工具包。
 6. **交付说明**：列出实际目标、已迁移功能、与示例的有意差异、通过项、未通过项（尤其预览与用户画面）、问题清单 `flow_findings.md`。
 7. **边界**：示例资产只读；`previous_controls.json` 只对旧求解谱系有效，空目标新建时不作为门禁；不一致的名称必须报错，不允许静默回退到 Seven 的名字。
+
+口型图布局默认仅在滑轨后方 **1 cm**，不继承旧版 6 cm 的大间距。Seven 为图形 Y=17、轨道 Y=18、手柄中心 Y=19；共用布局与参考图生成器通过 shape translation 调整，保留原 offset、X/Z、大小和逐行对齐。
 
 ## 6. 相关文档
 

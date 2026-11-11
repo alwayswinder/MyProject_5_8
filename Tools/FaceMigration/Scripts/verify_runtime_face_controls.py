@@ -22,6 +22,9 @@ from pathlib import Path
 import traceback
 import types
 import unreal
+from slider_handle_layout import (HANDLE_FORWARD_CM, RAIL_CONTROL, slider_keys,
+                                 validate_handle_depth, validate_rail_geometry, reference_shape_y,
+                                 PHONEME_REFERENCE_CONTROL, validate_reference_depth)
 
 ROOT = Path(unreal.Paths.convert_relative_path_to_full(unreal.Paths.project_dir()))
 SOURCE = _fm_asset('/Game/_MyTest/Mouth/LidDiagnostic/CR_Seven_LidWorldRotation')
@@ -58,7 +61,9 @@ def instance(asset):
     if not h.get_all_keys():
         h.copy_hierarchy(asset.get_hierarchy())
         inst.request_init()
-    assert len(h.get_bones()) == 149 and len(h.get_controls()) == 73 and len(h.get_curves()) == 28
+    assert len(h.get_bones()) == 149 and len(h.get_curves()) == 28
+    names = {str(k.name) for k in h.get_controls()}
+    assert len(names - {RAIL_CONTROL}) == 73
     return inst, h
 
 def key(name, kind=unreal.RigElementType.BONE):
@@ -133,7 +138,7 @@ def structural_and_transfer(phase):
         cases.append(values)
     si,srh=instance(source);ti,trh=instance(target)
     worst=dict(position_cm=0,rotation_deg=0,scale=0,curve=0,control_position_cm=0)
-    bone_keys=th.get_bones();curve_keys=th.get_curves();control_keys=th.get_controls()
+    bone_keys=th.get_bones();curve_keys=th.get_curves();control_keys=sh.get_controls()
     for i,values in enumerate(cases):
         solve(si,srh,values);solve(ti,trh,values)
         for bk in bone_keys:
@@ -150,7 +155,7 @@ def structural_and_transfer(phase):
     morphs={str(m) for m in mesh.get_all_morph_target_names()}
     assert curve_names<=morphs,curve_names-morphs
     report=dict(captured_at=datetime.datetime.now().astimezone().isoformat(),target=TARGET,phase=phase,passed=True,
-                animation_controls=72,visual_cues=1,bones=149,curves=28,nodes=len(tm.get_nodes()),links=len(tm.get_links()),
+                animation_controls=72,visual_cues=len(th.get_controls())-72,bones=149,curves=28,nodes=len(tm.get_nodes()),links=len(tm.get_links()),
                 execution_edges=len(edges),bone_writes=len(driven),cases=len(cases),coverage=coverage,worst=worst,
                 curve_targets_exist=True,comparison='live legacy Seven reference; migration equivalence, not new Max capture',
                 limits='compared with reference control values; role-specific verifiers assert functional limits')
@@ -183,6 +188,7 @@ def display_contract(phase='before_reload'):
         parent = h.get_first_parent(element)
         offset = h.get_global_control_offset_transform(element, True)
         shape = h.get_global_control_shape_transform(element, True)
+        local_shape = h.get_local_control_shape_transform(element, True)
         return {'display_name': str(settings.display_name),
                 'animation_type': str(settings.animation_type),
                 'control_type': str(settings.control_type),
@@ -190,6 +196,7 @@ def display_contract(phase='before_reload'):
                 'shape_name': str(settings.shape_name),
                 'shape_color': [round(v, 4) for v in settings.shape_color.to_tuple()],
                 'shape_scale': [round(v, 6) for v in shape.scale3d.to_tuple()],
+                'shape_local_p': [round(v, 6) for v in local_shape.translation.to_tuple()],
                 'offset_p': [round(v, 5) for v in offset.translation.to_tuple()],
                 'offset_r': [round(v, 6) for v in (offset.rotation.x, offset.rotation.y, offset.rotation.z, offset.rotation.w)],
                 'limits': [list(h.get_vector_from_control_value(settings.minimum_value).to_tuple()),
@@ -201,6 +208,33 @@ def display_contract(phase='before_reload'):
 
     source_rows = {str(k.name): row(sh, k) for k in sh.get_controls()}
     target_rows = {str(k.name): row(th, k) for k in th.get_controls()}
+    # 目标手柄向前浮起，属于明确的操作修正，不要求复制示例的共面缺陷。
+    handle_keys = slider_keys(th, target.get_editor_asset().get_default_model())
+    overrides = []
+    reference_y = reference_shape_y(th, target.get_editor_asset().get_default_model())
+    if reference_y is not None and PHONEME_REFERENCE_CONTROL in source_rows:
+        reference = source_rows[PHONEME_REFERENCE_CONTROL]
+        old = list(reference['shape_local_p'])
+        reference['shape_local_p'][1] = reference_y
+        overrides.append({'control': PHONEME_REFERENCE_CONTROL, 'field': 'shape_local_p',
+                          'reference': old, 'expected': reference['shape_local_p']})
+    for key in handle_keys:
+        name = str(key.name)
+        if name in source_rows:
+            old = list(source_rows[name]['shape_local_p'])
+            source_rows[name]['shape_local_p'][1] = HANDLE_FORWARD_CM
+            overrides.append({'control': name, 'field': 'shape_local_p',
+                              'reference': old, 'expected': source_rows[name]['shape_local_p']})
+    try:
+        depth_rows = validate_handle_depth(th, handle_keys)
+        rail_geometry = validate_rail_geometry(target)
+        reference_depth = validate_reference_depth(th, target.get_editor_asset().get_default_model())
+        depth_passed = True
+    except AssertionError as exc:
+        depth_rows = [{'error': str(exc)}]
+        rail_geometry = {'error': str(exc)}
+        reference_depth = {'error': str(exc)}
+        depth_passed = False
     diffs = []
     for name, reference in source_rows.items():
         got = target_rows.get(name)
@@ -216,6 +250,9 @@ def display_contract(phase='before_reload'):
     rails = [str(n.get_name()) for n in source.get_default_model().get_nodes() if str(n.get_name()).endswith('_RAIL')]
     target_rails = [str(n.get_name()) for n in target.get_editor_asset().get_default_model().get_nodes()
                     if str(n.get_name()).endswith('_RAIL')]
+    expected_target_names = set(source_rows) | {RAIL_CONTROL}
+    if RAIL_CONTROL not in target_rows or target_rows[RAIL_CONTROL]['animation_type'] != str(unreal.RigControlAnimationType.VISUAL_CUE):
+        diffs.append({'control': RAIL_CONTROL, 'field': 'missing_visual_cue'})
     libraries = [lib.get_path_name() for lib in target.get_editor_property('shape_libraries')]
     shape_sets = {}
     for path in libraries:
@@ -240,14 +277,19 @@ def display_contract(phase='before_reload'):
               'reference': SOURCE, 'target': TARGET,
               'controls_source': len(source_rows), 'controls_target': len(target_rows),
               'control_names_equal': set(source_rows) == set(target_rows),
+              'control_names_match_expected': expected_target_names == set(target_rows),
+              'auxiliary_controls_added': [RAIL_CONTROL], 'rail_geometry': rail_geometry,
+              'phoneme_reference_depth': reference_depth,
               'display_differences': diffs, 'shape_libraries_target': libraries,
+              'intentional_layout_overrides': overrides, 'slider_handle_depth_cm': HANDLE_FORWARD_CM,
+              'slider_handle_depth_passed': depth_passed, 'slider_handles': depth_rows,
               'shape_library_contents': {k: len(v) for k, v in shape_sets.items()},
               'shape_names_used': used, 'shape_names_unresolved': unresolved,
               'rail_nodes_source': len(rails), 'rail_nodes_target': len(target_rails),
               'rails_equal': rails == target_rails,
               'visual_acceptance': 'pending_user'}
-    report['passed'] = (not diffs and set(source_rows) == set(target_rows) and rails == target_rails
-                        and not unresolved)
+    report['passed'] = (not diffs and expected_target_names == set(target_rows) and rails == target_rails
+                        and not unresolved and depth_passed)
     # 固定报告名在 Evidence 根（Build.md 第 7 节）；同时保留 SevenRuntime 下的旧路径副本。
     for target_path in (_fm_output(EB/'layout_validation.json'), _fm_output(E/'layout_validation.json')):
         target_path.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding='utf-8')

@@ -70,8 +70,8 @@ mesh=target.get_editor_property('preview_skeletal_mesh')
 target_disk=_fm_disk('Content/_MyTest/Mouth/TMp/NewControlRigRuntimeAsset.uasset')
 dirty=None
 try:
-    packages=unreal.EditorLoadingAndSavingUtils.get_dirty_map_packages()
-    dirty=any(str(p.get_name()).split('.')[-1]=='NewControlRigRuntimeAsset' for p in packages)
+    packages=unreal.EditorLoadingAndSavingUtils.get_dirty_content_packages()
+    dirty=any(p.get_path_name()==target.get_outer().get_path_name() for p in packages)
     dirty_count=len(packages)
 except Exception as exc:
     dirty='ERR:'+str(exc)[:120];dirty_count=None

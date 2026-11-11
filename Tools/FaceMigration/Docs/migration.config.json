@@ -101,7 +101,12 @@
     "eye_expression_panel": "player_front_view_screen_left_near_character",
     "expression_and_phoneme_panel": "player_front_view_screen_right_near_character",
     "slider_increase": "screen_left_to_right",
+    "slider_handle_forward_cm": 1.0,
+    "slider_handle_depth_rule": "Initial/Current shape local +Y=1 cm for the Seven board; preserve control offset/input/solver. See Scripts/slider_handle_layout.py; adapt forward axis for other boards.",
+    "slider_rail_rendering": "opaque_depth_tested_visual_cue; disable foreground debug rails; add VIS_SLIDER_RAILS without changing animation interfaces; dependencies at <target_rig_package>_UI/",
+    "slider_rail_width_cm": 0.12,
     "phoneme_reference": "aligned_by_row_behind_slider_plane",
+    "phoneme_reference_behind_rail_cm": 1.0,
     "nose_sides": "below_overall_nose_control"
   },
   "checks": {

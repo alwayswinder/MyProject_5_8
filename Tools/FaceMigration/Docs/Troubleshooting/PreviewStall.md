@@ -68,6 +68,27 @@
 
 因此现阶段结论是“预览世界没有 tick 这个组件”，最可能是资产编辑器视口的**实时/可见性状态**（`VisibilityBasedAnimTickOption` 门控），而不是 Rig 内容或曲线绑定。确认方法：在编辑器里打开目标资产、确保视口实时开启（`Ctrl+R` 切换）并点一下视口，看时间是否推进；或在关卡放一个临时 ControlRig actor 用 PIE 验证曲线能否到网格。
 
+## 2026-11-10 可用宿主：关卡网格 + AnimBlueprint + PIE（已验证通过）
+
+按上面的建议换成 ticking 宿主后，同一份资产一次通过：
+
+| 项目 | 值 |
+|---|---|
+| 关卡 | `L_SevenLipSync` |
+| 网格 | `SkeletalMeshActor_1`（label `NewControlRigRuntimeAsset`），网格 `Seven` |
+| 动画蓝图 | `/Game/_MyTest/Mouth/TMp/NewAnimBlueprint`，内含 ControlRig Layer → `NewControlRigRuntimeAsset` |
+| 宿主 | PIE（`UEDPIE_0_L_SevenLipSync`） |
+
+| 观察 | 结果 |
+|---|---|
+| PIE 中 ControlRig 时钟 | 持续推进（0 → 105 s） |
+| 编辑器世界的同一组件 | 仍停在 0（确认问题在宿主，不在资产） |
+| 设 5 个控制后（表情 / 口型 / 右上眼皮 / 左眉 / 左嘴角） | 网格曲线 = Rig 曲线，`Seven_Head_huangzhang` `Seven_Pupil_huangzhang` 均 `0.50014`，逐条误差 0 |
+| 骨骼输出 | `Bone028` = `[-4.346073, 8.112865, 158.336031]`，与独立实例采样一致 |
+| 证据 | `Saved/FaceMigration/Jobs/<任务>/Current/Evidence/pie_preview_check.json` |
+
+**结论**：资产、求解、曲线到网格的链路都正常；`ControlRigRuntimeAsset` 的“正常帧”应在 ticking 宿主（PIE / 含 ControlRig Layer 的 AnimBlueprint）上验证，不要拿资产编辑器的非 tick 预览世界当门禁。`assemble_delivery.py` 会把这两段分开记：`normal_frame_preview`（资产编辑器）与 `normal_frame_preview_pie`（PIE 宿主）。
+
 ## 相关环境事实
 
 - 当前关卡 `L_SevenLipSync` 里没有 ControlRig actor，只有两个 SkeletalMeshActor，预览只能依赖资产编辑器的临时世界。

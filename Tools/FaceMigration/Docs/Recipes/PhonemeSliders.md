@@ -6,6 +6,8 @@
 
 布局位于 **角色左侧、玩家视角右侧**。四表情列在 X=22–30 cm，新口型列在 X=34–42 cm，两列间隔 4 cm；Y 均为 18 cm。12 行从上到下严格按用户给定顺序排列，起始 Z=164 cm，行距 4 cm，末行 Z=120 cm。使用黄色轨道与球形手柄，手柄直径约 1 cm；层级显示名沿用 Max 控制名，便于逐项对照。
 
+上述 Y=18 为控制 offset 与轨道所在平面。后续生成按[拾取间距规则](../Workflow/Build.md#滑块与滑轨的拾取间距)将手柄 shape 沿局部 +Y 前移 1 cm，中心为 Y=19；旧置顶调试线关闭，轨道改为正常深度测试的不透明实体辅助形状，线宽 0.12 cm。参考图现在显示于 Y=17，仅在轨道后方 1 cm，保留辅助控制原 offset。历史示例资产保持不变。
+
 每行 **从玩家视角左端向右端拖动**增加口型，左端为 0，右端为完整权重。控制类型为 `POSITION`，局部 X 范围 0–8，局部 Y/Z 锁定为 0，Initial 值为 0；X=4 为一半权重，X=8 为完整权重。各项可独立使用或叠加，也可与骨骼嘴部控制、四个整体表情组合。
 
 | 顺序 | Max / 显示名 | UE 控制 | 实测对应 Morph |
@@ -30,6 +32,8 @@
 2026-11-09 使用用户提供的 `Texture2D /Game/_MyTest/Mouth/LidDiagnostic/口型单列竖排12个_去背景_1`（1158 × 3620），在每行滑块右侧添加对应口型。按原图自上而下顺序对应上表；原图各行不等距，通过十二块独立 UV 平面对齐到 Z=164–120 cm，行距 4 cm。图形中心 X=47、Y=12 cm，口型最大宽 4.5 cm，所有行保持同一像素比例。显示区域只取十二个口型，跳过外围留白和底部水印，原贴图未修改。
 
 用户反馈滑块偶尔难选中后，参考图从 Y=18 后移到 Y=12 cm，位于滑块 Y=18 平面后方 6 cm；X/Z 和逐行对齐保持，减少斜视时参考图平面对滑块拾取的遮挡。参考图仍是不可选择的 Visual Cue。`Tools/FaceMigration/Scripts/update_phoneme_reference_depth.py` 已备份、保存重载并恢复用户输入，其他控制偏移与 Rig 节点 / 执行连接保持；实际选取手感由用户确认。
+
+上段是旧版修改记录。2026-11-11 改为正常深度测试的实体滑轨后，用户要求收近图形与滑轨：当前目标参考图从显示 Y=12 收近到 Y=17，轨道后方间距从 6 cm 减至 1 cm，X/Z、比例、行序、控制 offset 和手柄间距保持。此调整通过参考图 Initial/Current shape translation 完成；共用生成器、验证器与 `update_phoneme_reference_depth.py` 均遵循新规则，历史示例不改写。
 
 展示资产位于 `/Game/_MyTest/Mouth/LidDiagnostic/PhonemeReference/`：`SM_PhonemeReference` 是 24 三角面的参考网格，`M_PhonemeReference` 使用原贴图 RGB 自发光、Alpha 遮罩和双面显示，`SL_PhonemeReference` 是独立形状库。Rig 保留原默认形状库，追加此库。`VIS_PHONEME_REFERENCE` 是三轴锁定的 POSITION / VISUAL_CUE，只用于显示，不参与骨骼或 Morph 驱动，也不作为动画滑块。
 

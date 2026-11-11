@@ -11,6 +11,7 @@ _fm_sys.dont_write_bytecode = True
 import datetime,json,math,types
 from pathlib import Path
 import unreal
+from slider_handle_layout import RAIL_CONTROL
 ROOT=Path(unreal.Paths.convert_relative_path_to_full(unreal.Paths.project_dir()));E=_fm_tool('Docs/Evidence/NoseSides')
 b=types.ModuleType('nose_sides');exec(compile((_fm_read(_fm_tool('Scripts/build_nose_side_controls.py'))).read_text(encoding='utf-8'),'nose_sides','exec'),b.__dict__)
 def main():
@@ -22,7 +23,8 @@ def main():
     def update(pre,errs):
         for name,e in zip(('position_cm','rotation_deg','scale'),errs):report[pre+name]=max(report.get(pre+name,0),e)
     def mq(q):return unreal.Quat(q[0],-q[1],q[2],q[3])
-    assert len(h.get_bones())==149 and len(h.get_controls())==73 and len(h.get_curves())==28
+    assert len(h.get_bones())==149 and len(h.get_curves())==28
+    assert len({str(k.name) for k in h.get_controls()} - {RAIL_CONTROL})==73
     for hh in (rig.get_hierarchy(),h):
         for row in p['controls']:
             k=b.key(row['control'],unreal.RigElementType.CONTROL)

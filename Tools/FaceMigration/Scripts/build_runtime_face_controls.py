@@ -17,6 +17,7 @@ import json
 from pathlib import Path
 import shutil
 import unreal
+from slider_handle_layout import apply_slider_layout, RAIL_CONTROL
 
 ROOT = Path(unreal.Paths.convert_relative_path_to_full(unreal.Paths.project_dir()))
 SOURCE = _fm_asset('/Game/_MyTest/Mouth/LidDiagnostic/CR_Seven_LidWorldRotation')
@@ -36,7 +37,8 @@ def main():
     sh, th = source.get_hierarchy(), target.hierarchy
     sm, tm = source.get_default_model(), editor.get_default_model()
     assert len(th.get_controls()) == 0 and len(tm.get_nodes()) <= 1, '目标已有内容，停止覆盖'
-    assert len(sh.get_bones()) == 149 and len(sh.get_controls()) == 73 and len(sh.get_curves()) == 28
+    assert len(sh.get_bones()) == 149 and len(sh.get_curves()) == 28
+    assert len({str(k.name) for k in sh.get_controls()} - {RAIL_CONTROL}) == 73
     assert not source.get_local_function_library().get_nodes(), '存在本地函数，需额外迁移'
     _fm_output(E).mkdir(parents=True, exist_ok=True)
     backup = _fm_saved('Backup') / ('SevenRuntime_' + datetime.datetime.now().strftime('%Y%m%d_%H%M%S'))
@@ -71,6 +73,8 @@ def main():
             assert len(imported) == len(sm.get_nodes()), (len(imported), len(sm.get_nodes()))
             # 新资产以作者设定的 Initial 值启动，不继承参考资产的当前预览姿势。
             th.reset_pose_to_initial(unreal.RigElementType.CONTROL)
+            # 示例轨道可能穿过手柄；目标统一应用拾取间距，不改写示例资产。
+            apply_slider_layout(target)
             editor.recompile_vm()
             assert len(tm.get_nodes()) == len(sm.get_nodes())
             def links(model):

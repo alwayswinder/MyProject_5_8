@@ -48,6 +48,7 @@ class Context:
     legacy_runtime_adapter: bool = False
     explicit_job: bool = False
     source: dict[str, str] = field(default_factory=dict)
+    layout: dict[str, str] = field(default_factory=dict)
 
     def __post_init__(self):
         self.project = Path(self.project).resolve()
@@ -90,7 +91,8 @@ class Context:
         return {'schema_version': 1, 'job_id': self.job_id, 'character': self.character,
                 'project': str(self.project), 'asset_overrides': self.asset_overrides,
                 'legacy_runtime_adapter': self.legacy_runtime_adapter,
-                **({'source': self.source} if self.source else {})}
+                **({'source': self.source} if self.source else {}),
+                **({'layout': self.layout} if self.layout else {})}
 
 
 _context: Context | None = None
@@ -106,6 +108,7 @@ def configure(project=None, job=None, config=None):
                        asset_overrides=config.get('asset_overrides', {}),
                        legacy_runtime_adapter=config.get('legacy_runtime_adapter', False),
                        source=config.get('source', {}),
+                       layout=config.get('layout', {}),
                        explicit_job=bool(job or config))
     return _context
 

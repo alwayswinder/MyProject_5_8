@@ -11,6 +11,7 @@ _fm_sys.dont_write_bytecode = True
 import datetime,json,shutil,types
 from pathlib import Path
 import unreal
+from slider_handle_layout import apply_reference_depth
 ROOT=Path(unreal.Paths.convert_relative_path_to_full(unreal.Paths.project_dir()))
 E=_fm_tool('Docs/Evidence/PhonemeReference')
 FOLDER=_fm_asset('/Game/_MyTest/Mouth/LidDiagnostic/PhonemeReference')
@@ -87,6 +88,7 @@ def main():
             tf=unreal.Transform();tf.translation=unreal.Vector(*p['origin'])
             h.set_control_offset_transform(key,tf,initial,True);h.set_control_shape_transform(key,unreal.Transform(),initial)
         h.set_control_value(key,h.make_control_value_from_vector(unreal.Vector()),unreal.RigControlValueType.INITIAL)
+        apply_reference_depth(h, rig.get_default_model())
         rig.recompile_vm();assert rig.get_editor_property('status')!=unreal.BlueprintStatus.BS_ERROR
     assert signature(rig)==before,'Rig graph changed'
     assert samples(rig)==old_samples,'Existing deformation outputs changed'
