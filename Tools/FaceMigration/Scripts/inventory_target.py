@@ -78,9 +78,10 @@ def bone_transforms(hierarchy):
     out = {}
     for bone in hierarchy.get_bones():
         value = hierarchy.get_global_transform(bone, True)
-        out[str(bone.name)] = {'pos': [round(v, 6) for v in value.translation.to_tuple()],
-                               'rot': [round(v, 6) for v in value.rotation.to_tuple()],
-                               'scale': [round(v, 6) for v in value.scale3d.to_tuple()]}
+        # 判定使用引擎原始精度；六位舍入会把约 6e-8 的四元数差放大到 1e-6。
+        out[str(bone.name)] = {'pos': list(value.translation.to_tuple()),
+                               'rot': list(value.rotation.to_tuple()),
+                               'scale': list(value.scale3d.to_tuple())}
     return out
 
 

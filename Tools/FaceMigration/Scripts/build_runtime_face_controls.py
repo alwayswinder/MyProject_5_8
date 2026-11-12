@@ -27,6 +27,33 @@ E = _fm_tool('Docs/Evidence/SevenRuntime')
 def digest(path):
     return hashlib.sha256(_fm_read(path).read_bytes()).hexdigest()
 
+def migrate_member_variables(source, editor):
+    """Import typed member storage before importing nodes that reference it."""
+    rows = []
+    assert not editor.get_asset_variables(), '空目标包含成员变量，需增量适配'
+    for variable in source.get_member_variables():
+        assert not variable.exposed_on_spawn and not variable.expose_to_cinematics, \
+            '公开动画变量需要额外迁移元数据，停止而非静默丢弃'
+        cpp_type = (variable.cpp_type_object.get_path_name()
+                    if variable.cpp_type_object else variable.cpp_type)
+        name = editor.add_member_variable(variable.name, cpp_type, variable.public,
+                                          False, variable.default_value)
+        assert str(name) == str(variable.name), (name, variable.name)
+        copied = next(v for v in editor.get_asset_variables() if v.name == name)
+        assert copied.cpp_type == variable.cpp_type
+        assert copied.cpp_type_object == variable.cpp_type_object
+        assert copied.default_value == variable.default_value
+        assert copied.public == variable.public and copied.private == variable.private
+        rows.append(dict(name=str(name), cpp_type=copied.cpp_type,
+                         type_object=str(copied.cpp_type_object),
+                         default_value=copied.default_value, public=copied.public,
+                         private=copied.private,
+                         source_expose_to_cinematics=variable.expose_to_cinematics,
+                         target_expose_to_cinematics=copied.expose_to_cinematics,
+                         metadata_warning=('UE RuntimeAsset adds CPF_Interp even when source exposure is false'
+                                           if copied.expose_to_cinematics != variable.expose_to_cinematics else None)))
+    return rows
+
 def main():
     assert SOURCE != TARGET, '源和目标不能相同；检查任务资产映射'
     source, target = unreal.load_asset(SOURCE), unreal.load_asset(TARGET)
@@ -66,6 +93,7 @@ def main():
             for prop in ('hierarchy_settings', 'shape_libraries', 'source_hierarchy_import', 'source_curve_import'):
                 target.set_editor_property(prop, source.get_editor_property(prop))
             editor.set_preview_mesh(source.get_preview_mesh(), True)
+            report['member_variables'] = migrate_member_variables(source, editor)
             controller = editor.get_controller(tm)
             for node in list(tm.get_nodes()):
                 assert controller.remove_node(node, False)

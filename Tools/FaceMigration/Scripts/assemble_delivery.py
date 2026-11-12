@@ -43,6 +43,8 @@ def main():
     preview = load('SevenRuntime/preview_morph_check.json')
     pie_preview = load('pie_preview_check.json')
     final = load('final_state.json')
+    animated_before = load('SevenRuntime/before_reload/animated_space_validation.json')
+    animated_after = load('SevenRuntime/after_reload/animated_space_validation.json')
     crosschecks = {}
     ignored = []
     for path in sorted(E.glob('max_crosscheck_*.json')):
@@ -113,6 +115,9 @@ def main():
                                 {'host': pie_preview.get('host'), 'controls_set': pie_preview.get('controls_set'),
                                  'mesh_curves_equal_rig': pie_preview.get('mesh_curves_equal_rig'),
                                  'rig_clock_advancing': pie_preview.get('rig_clock_advancing'),
+                             'head_space_cases': pie_preview.get('head_space_cases'),
+                             'head_space_normal_frame_passed': pie_preview.get('head_space_normal_frame_passed'),
+                             'animation_sequence_host_tested': pie_preview.get('animation_sequence_host_tested'),
                                  'result': pie_preview.get('result')}))
     else:
         segments.append(segment('normal_frame_preview_pie', False, {}, skipped=True,
@@ -128,7 +133,18 @@ def main():
     else:
         segments.append(segment('legacy_part_verifiers', False, {}, skipped=True, reason='未运行 verify_runtime_face_controls.py'))
 
-    numeric_names = ('task_sheet', 'structure', 'binding_probe', 'reference_to_target', 'display_contract', 'save_reload')
+    for name, field in (('animated_head_space', 'animated_head_space_passed'),
+                         ('control_head_follow', 'control_head_follow_passed')):
+        segments.append(segment(name,
+            bool(animated_before and animated_after and animated_before.get(field) and animated_after.get(field)),
+            {'before_reload_cases': (animated_before or {}).get('cases'),
+             'after_reload_cases': (animated_after or {}).get('cases'),
+             'animation': (animated_after or {}).get('animation'),
+             'worst': (animated_after or {}).get('worst'),
+             'variable_metadata_differences': (animated_after or {}).get('variable_metadata_differences'),
+             'scope': 'independent instances; normal-frame animated host and Sequencer are separate'}))
+    numeric_names = ('task_sheet', 'structure', 'binding_probe', 'reference_to_target', 'display_contract',
+                     'save_reload', 'animated_head_space', 'control_head_follow')
     numeric = [s for s in segments if s['name'] in numeric_names or s['name'].startswith('max_to_target:')]
     validation = {
         'captured_at': (final or {}).get('captured_at') or (adaptation or {}).get('captured_at'),
@@ -174,7 +190,15 @@ def main():
                                  'shape_actor_count': (final or {}).get('shape_actor_count'),
                                  'visual_acceptance': (layout or {}).get('visual_acceptance', 'pending_user')},
         'skipped': {s['name']: s.get('reason') for s in segments if s.get('skipped')},
-        'conclusion': ('passed' if validation['numeric_passed'] and (validation['preview_passed'] or validation['preview_pie_passed'])
+        'overall_passed': bool(validation['numeric_passed'] and
+                               (validation['preview_passed'] or validation['preview_pie_passed']) and
+                               (layout or {}).get('visual_acceptance') == 'passed' and
+                               (pie_preview or {}).get('animation_sequence_host_tested') and
+                               (pie_preview or {}).get('sequencer_tested')),
+        'animation_sequence_host_tested': bool((pie_preview or {}).get('animation_sequence_host_tested')),
+        'sequencer_tested': bool((pie_preview or {}).get('sequencer_tested')),
+        'variable_metadata_differences': (animated_after or {}).get('variable_metadata_differences', []),
+        'conclusion': ('technical_checks_passed_pending_acceptance' if validation['numeric_passed'] and (validation['preview_passed'] or validation['preview_pie_passed'])
                        else 'not_overall_passed'),
         'conclusion_reason': ('numeric/display/reload passed and a ticking PIE host confirmed the mesh curves; '
                               'the asset-editor preview world itself still does not tick this component; '

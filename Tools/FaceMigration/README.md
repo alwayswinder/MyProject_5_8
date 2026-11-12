@@ -1,5 +1,9 @@
 # FaceMigration
 
+2026-11-12 已在用户新建的空目标 `NewControlRigRuntimeAsset` 上按新角色流程重跑，配置 [seven-taskflow-20261112.json](Jobs/seven-taskflow-20261112.json)。重新读表、独立探测及备份后判为绑定等价，迁入更新后的示例设计：72 动画控制 + 2 Visual Cue、149 骨、28 曲线、1927 节点 / 2645 连接，包含私有头部缓存与 FACE_SPACE。保存前和重载后各 1175 组迁移对照误差为零、显示契约无差异、各 592 组动画姿势检查通过；当前 Max 上眼皮五点抽检及 PIE 81 组正常帧检查通过。源只读，临时 PIE Actor 已清理，未保存用户关卡。
+
+本轮修正了绑定判定的六位舍入误判、补齐 RuntimeAsset 成员变量迁移，并将两项动画空间检查纳入保存重载与交付门禁。保留问题：资产编辑器预览仍停在 0.4 秒，刷新一次无效（PIE 为独立宿主通过）；引擎给私有变量额外设置 Cinematics 标记及丢失分类；身体动画播放宿主、Sequencer、最终画面与拾取尚未验收。不能写整体验收通过。详见本轮 `Saved/FaceMigration/Jobs/seven-taskflow-20261112/Current/Evidence/flow_findings.md` 和[角色当前记录](Characters/Seven/README.md)。下文旧任务记录保留历史结论。
+
 将原来的文档、脚本、角色数据及关联资料集中成一个可迁移目录。整体复制此目录到另一项目的 `Tools/FaceMigration/`；运行日志和备份不需要一起复制。
 
 ## 开始：填任务单
@@ -29,6 +33,8 @@ Tools/FaceMigration/
 ```
 
 ## 迁移到其他项目
+
+动画适配有两项独立要求：**面部求解保留动画头部 Transform**，以及**控制器、滑轨、参考图随头部平移旋转**。症状、修复选择、继承依赖与现有脚本覆盖边界见[主流程两项必查](Docs/Workflow/Build.md#动画头部空间与控制器跟随两项必查)，验收见[独立验收](Docs/Workflow/Validation.md#41-动画头部空间与控制器跟随的独立验收)。当前示例 Blueprint 已修复并有本轮记录；新目标仍需重新绑定和实测，现有通用构建/验证并不自动保证两项通过。
 
 1. 复制整个 `FaceMigration` 文件夹，不复制原项目的 `Saved`。另外准备示例 Rig 及其形状库、材质和贴图依赖，以及 Max 场景、UE 网格、骨架和 Morph；工具包不包含这些 UE 资产，也不包含原始采样（在 `Saved/FaceMigration/Characters/<角色>/`，需要时从原项目拷回或重新采样）。
 2. 在 `Jobs/` 增加小型 JSON 配置，使用独立 `job_id`、`character` 和 `asset_overrides`。保留示例和目标为不同资产。一个目标一份配置：`asset_overrides` 必须精确命中脚本里写死的包路径（默认是 `/Game/_MyTest/Mouth/TMp/NewControlRigRuntimeAsset`），它只影响 `asset_path()` / `asset_disk_path()` 的调用点，不影响脚本里的日志或外部命令。换资产后先用 `probe_cr_migration.py` 复核报告里的 `target` 字段，确认没有读写旧路径。旧配方配置 [seven-runtime.json](Jobs/seven-runtime.json) 会将多条 Rig 路径映射到同一目标，不能用于需要独立示例的整图迁移，也不是全量重建清单。

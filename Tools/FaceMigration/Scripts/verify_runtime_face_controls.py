@@ -25,6 +25,7 @@ import unreal
 from slider_handle_layout import (HANDLE_FORWARD_CM, RAIL_CONTROL, slider_keys,
                                  validate_handle_depth, validate_rail_geometry, reference_shape_y,
                                  PHONEME_REFERENCE_CONTROL, validate_reference_depth)
+from face_paths import context, PACKAGE_ROOT
 
 ROOT = Path(unreal.Paths.convert_relative_path_to_full(unreal.Paths.project_dir()))
 SOURCE = _fm_asset('/Game/_MyTest/Mouth/LidDiagnostic/CR_Seven_LidWorldRotation')
@@ -161,6 +162,108 @@ def structural_and_transfer(phase):
                 limits='compared with reference control values; role-specific verifiers assert functional limits')
     out=E/phase/'transfer_validation.json';_fm_output(out.parent).mkdir(parents=True,exist_ok=True)
     _fm_output(out).write_text(json.dumps(report,ensure_ascii=False,indent=2),encoding='utf-8')
+    return report
+
+def animated_space_validation(phase):
+    """Check animated input preservation and every UI element separately."""
+    import wrap_face_head_space as w
+    source = unreal.load_asset(SOURCE)
+    target = RuntimeRig(unreal.load_asset(TARGET))
+    job = PACKAGE_ROOT / 'Jobs' / (context().job_id + '.json')
+    cfg = json.loads(job.read_text(encoding='utf-8-sig'))['validation']
+    head_name = cfg['head_bone']
+    head = key(head_name)
+    si, sh = instance(source)
+    ti, th = instance(target)
+    space = key('FACE_SPACE', unreal.RigElementType.NULL)
+    assert th.contains(space)
+    parent = th.get_first_parent(space)
+    assert parent.name == head.name and parent.type == head.type
+    source_variables = {str(v.name): v for v in source.get_member_variables()}
+    target_variables = {str(v.name): v for v in target.editor.get_asset_variables()}
+    assert set(source_variables) == set(target_variables), '成员变量未完整迁移'
+    metadata_differences = []
+    for name, v in source_variables.items():
+        other = target_variables[name]
+        for field in ('cpp_type', 'cpp_type_object', 'default_value', 'public', 'private'):
+            assert getattr(v, field) == getattr(other, field), (name, field)
+        for field in ('expose_to_cinematics', 'exposed_on_spawn', 'category', 'tooltip'):
+            if str(getattr(v,field)) != str(getattr(other,field)):
+                metadata_differences.append(dict(variable=name,field=field,
+                    source=str(getattr(v,field)),target=str(getattr(other,field))))
+    initial = th.get_global_transform(head, True)
+    poses = [('reference', {})]
+    for label, delta, rotation in (('head_turn', (30,-20,12), (15,35,8)),
+                                    ('head_opposite', (-15,5,-10), (-25,-50,30))):
+        tf = unreal.Transform()
+        tf.translation = initial.translation + unreal.Vector(*delta)
+        tf.rotation = unreal.Rotator(*rotation).quaternion() * initial.rotation
+        tf.scale3d = initial.scale3d
+        poses.append((label, {head_name: w.encoded(tf)}))
+    animation_path = cfg.get('animation')
+    times = []
+    if animation_path:
+        animation = unreal.load_asset(_fm_asset(animation_path))
+        assert animation, animation_path
+        options = unreal.AnimPoseEvaluationOptions()
+        options.optional_skeletal_mesh = target.asset.get_editor_property('preview_skeletal_mesh')
+        options.should_retarget = True
+        length = animation.get_play_length()
+        times = [0., length*.25, length*.5, length*.75, max(0., length-1./30.)]
+        for time in times:
+            pose = unreal.AnimPoseExtensions.get_anim_pose_at_time(animation, time, options)
+            poses.append(('animation_'+str(time), {str(k.name): w.encoded(
+                unreal.AnimPoseExtensions.get_bone_pose(pose, k.name, unreal.AnimPoseSpaces.WORLD))
+                for k in th.get_bones()}))
+    affected = w.subtree(th, head_name)
+    rows = []
+    worst = dict(head=[0.,0.,0.], body=[0.,0.,0.], transfer=[0.,0.,0.],
+                 controls=[0.,0.,0.], shapes=[0.,0.,0.], repeated=[0.,0.,0.])
+    def compare(section, a, b):
+        errors = w.error(a,b)
+        worst[section] = [max(x,y) for x,y in zip(worst[section],errors)]
+        assert errors[0] < 1e-4 and errors[1] < 1e-3 and errors[2] < 1e-5, (section,errors)
+    for label, values in w.cases(th):
+        w.reset(th,values)
+        assert ti.execute('Forwards Solve')
+        reference = {kind: {str(k.name): w.encoded(fn(k)) for k in th.get_controls()}
+                     for kind,fn in (('controls',th.get_global_transform),
+                                     ('shapes',th.get_global_control_shape_transform))}
+        for pose_label, pose in poses:
+            for host,h in ((si,sh),(ti,th)):
+                w.reset(h,values)
+                for name,tf in pose.items():
+                    h.set_global_transform(key(name),w.decoded(tf),False,True)
+            input_head = th.get_global_transform(head)
+            input_body = {str(k.name): w.encoded(th.get_global_transform(k))
+                          for k in th.get_bones() if str(k.name) not in affected}
+            assert si.execute('Forwards Solve') and ti.execute('Forwards Solve')
+            compare('head',th.get_global_transform(head),input_head)
+            for name,tf in input_body.items():
+                compare('body',th.get_global_transform(key(name)),w.decoded(tf))
+            for k in th.get_bones():
+                compare('transfer',th.get_global_transform(k),sh.get_global_transform(k))
+            for section,fn in (('controls',th.get_global_transform),
+                               ('shapes',th.get_global_control_shape_transform)):
+                for name,tf in reference[section].items():
+                    expected = unreal.MathLibrary.compose_transforms(
+                        unreal.MathLibrary.make_relative_transform(w.decoded(tf),initial),input_head)
+                    compare(section,fn(key(name,unreal.RigElementType.CONTROL)),expected)
+            before = {k: th.get_global_transform(k) for k in th.get_all_keys()
+                      if k.type != unreal.RigElementType.CURVE}
+            assert ti.execute('Forwards Solve')
+            for k,tf in before.items():
+                compare('repeated',th.get_global_transform(k),tf)
+            assert w.inputs(th) == {str(k.name): values.get(str(k.name),[0.,0.,0.]) for k in th.get_controls()}
+            rows.append(dict(input=label,pose=pose_label))
+    report = dict(passed=True,phase=phase,target=TARGET,head_bone=head_name,
+                  animation=animation_path,animation_times=times,cases=len(rows),worst=worst,
+                  animated_head_space_passed=True,control_head_follow_passed=True,
+                  member_variables=list(target_variables),sequencer='not_tested',
+                  variable_metadata_differences=metadata_differences,
+                  normal_frame='separate_preview_report',visual_acceptance='pending_user')
+    _fm_output(E/phase/'animated_space_validation.json').write_text(
+        json.dumps(report,ensure_ascii=False,indent=2),encoding='utf-8')
     return report
 
 class AdaptVerifier(ast.NodeTransformer):
@@ -381,6 +484,7 @@ def main(phase='before_reload'):
     _fm_output(E).mkdir(parents=True,exist_ok=True)
     transfer=structural_and_transfer(phase)
     display=display_contract(phase)
+    animated=animated_space_validation(phase)
     legacy_status,legacy_reason=legacy_applicability()
     if legacy_status=='applicable':
         source=legacy_verifiers(phase)
@@ -390,7 +494,8 @@ def main(phase='before_reload'):
         legacy_passed=True
         (_fm_output(E/phase/'source_verifiers.json')).write_text(json.dumps([],ensure_ascii=False,indent=2),encoding='utf-8')
     report=dict(captured_at=datetime.datetime.now().astimezone().isoformat(),target=TARGET,phase=phase,
-                passed=transfer['passed'] and display['passed'] and legacy_passed,
+                passed=transfer['passed'] and display['passed'] and animated['passed'] and legacy_passed,
+                animated_space_passed=animated['passed'],animated_space_cases=animated['cases'],
                 transfer_passed=transfer['passed'],transfer_cases=transfer['cases'],
                 display_passed=display['passed'],display_differences=len(display['display_differences']),
                 display_unresolved_shapes=display['shape_names_unresolved'],

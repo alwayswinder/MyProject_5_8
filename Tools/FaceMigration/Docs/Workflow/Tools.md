@@ -25,9 +25,20 @@
 - 第 2 步的 `route` 有三值：`derive_from_reference_equivalence_check`（等价且目标为空）、`incremental_repair_existing_target`（目标已有内容）、`rebind_and_refit`（骨架/Morph 不一致）。第 3 步只在第一种情况执行；已有内容时构建器会拒绝，属预期。
 - 第 5 步的抽检参数来自任务配置的 `crosscheck` 段（或 `Characters/<角色>/crosscheck.json`）：控制名、Max 对象、控制器槽位、轴、UI 缩放、骨表、主骨与容差。Max 采样由 MaxScript 直接返回，**不经过人工转录**；`safe_mode` 只拦文件写，返回载荷不受影响。
 - 第 4 步把“旧控回归”当成分段而非全局门禁：`legacy_status=not_applicable` 时写原因（`case.bones` 为空、历史曲线名不在当前层级、缺 `previous_controls.json`），不跑该段，也不把它算作通过。
-- 第 6 步的保存前门禁 = 迁移对照 + 显示契约通过；旧控回归仅在同谱系时才要求通过。因此空目标/示例派生路线可以使用官方保存重载入口，不再需要自写重载脚本。
+- 第 6 步的保存前门禁 = 迁移对照 + 显示契约 + 动画空间检查通过；旧控回归仅在同谱系时才要求通过。任务必须填写 `validation.head_bone`，并以 `validation.animation` 指定本角色身体动画。第 4、6 步分别生成 `SevenRuntime/<before_reload|after_reload>/animated_space_validation.json`，单列头部输入保留、身体输入保留、控制/形状跟随及重复求解；第 8 步缺少任一报告不得通过。
+- 动画交付还必须按[主流程两项必查](Build.md#动画头部空间与控制器跟随两项必查)和[独立验收](Validation.md#41-动画头部空间与控制器跟随的独立验收)补齐“动画头部空间”和“控制器头部跟随”两项结论。第 2 步盘点依赖、第 3 步适配、第 4～7 步在动画姿势和保存重载后复验、第 8 步单列状态。现有八个入口尚未自动覆盖这两项全部检查；默认姿势的迁移对照或旧交付报告不能替代。
+- `validation` 是本轮测试参数；`layout` 用于修改资产的空间安装入口，属于任务归属标记。任务初始化后更改后者会被隔离机制拒绝，不应删除或手改归属标记绕过检查。
+- `verify_runtime_face_preview.py` 在配置头部锚点的 PIE 任务中增加六组非零头部变换（两方向 × 中性/单控/组合），检查最终网格、全部控制与形状；加上 72 单控、组合和恢复共 81 组。注入方式为实际 Rig 层级，宿主仍是参考姿势 AnimBP；这不能声称已经在播放身体动画的 AnimBP 或 Sequencer 中验收。
 
 ## 工具连接
+
+### 已有 Blueprint 面部图的动画头部跟随
+
+`wrap_face_head_space.py` 通过任务的 `layout.target`、`layout.head_bone`、`layout.readonly_asset` 定位目标、头部锚点和只读保护资产。在正向入口缓存当前头部，临时将其 Current 归到 Initial 参考空间；原链末尾恢复缓存头部。两次设置均传播子级，内部原始求解不改。脚本先备份磁盘和当前内存资产，再做原姿态及头部运动的控制回归，失败会回滚自身节点与变量。已有包装时拒绝重装。
+
+此入口目前仅支持 Blueprint Rig，且要求原求解只写头部锚点下的面部骨骼；不要用于已有相同头部空间转换的图。它保留原 Rig 对面部的覆盖语义，不等于保留动画面部姿态的增量层。Seven 本轮用户明确授权修改示例，配置见 `Jobs/seven-reference-head-space-20261112.json`；一般迁移仍默认只读示例。
+
+UE 5.8 的 `add_member_variable` 对结构体要求完整类型路径（如 `/Script/CoreUObject.Transform`），传 `FTransform` 会触发引擎断言。`add_variable_node` 则使用 `FTransform` 并显式传入 Transform 的 ScriptStruct。复制旧式 Blueprint 后应先保存重载再接线，避免重复对象的旧 RigVM 链接缓存失效。
 
 | 任务 | 入口 | 使用要求 |
 |---|---|---|
@@ -96,6 +107,12 @@ UE 远程节点不可用时，继续做离线资料检查并明确未进行实�
 | 手柄在轨道前方，便于拾取 | `update_slider_handle_depth.py` / `slider_handle_layout.py` | shape 局部 +Y=1 cm；旧置顶调试线关闭，改为线宽 0.12 cm 的不透明、遵守深度测试的实体 Visual Cue；生成和验证共用此规则，见 [布局规则](Build.md#滑块与滑轨的拾取间距) |
 | Morph 层级曲线有值、预览暂未收到 | `refresh_expression_preview.py` / `refresh_phoneme_preview.py` / `refresh_eye_expression_preview.py` | 保留输入重开预览，正常动画帧后检查；眼神结束采样另用 `finish_eye_expression_preview.py` 检查恢复 |
 
+### 控制器显示跟随动画头部
+
+`update_face_control_space.py` 使用 `layout.target`、`layout.head_bone`、`layout.readonly_asset` 和可选的 `layout.animation`，给已能正确处理头部动画的 Blueprint 面部 Rig 增加 `head → FACE_SPACE` Null。共用层级操作在 `face_design_space.attach_face_control_space()`；只转换顶层控制的参考 offset，保留子控制层级、Initial/Current 输入、控制设置和形状，不改图。已有 FACE_SPACE 时拒绝重装；已有其他 Null 或多父级时停止，先明确空间映射。保存前、重载后对照原骨骼/曲线输出与控制器/形状头部跟随，异常回退自身层级修改。示例任务为 `seven-reference-control-space-20261112`。
+
+该入口不提供面部皮肤贴附或动画回解。动画采样写入骨骼时应像 AnimNode 一样传播非骨骼子级；不要用 `bAffectChildren=False` 保世界来模拟动画输入。重设父级会清理显示名标点，须恢复完整控制设置。继承更新后的示例时还须携带 FACE_SPACE 及其头部绑定；仅逐个复制控制设置的旧增量适配器需要先适配新父级，不能把 Null 当成普通骨骼。
+
 ## 示例派生与新式资产迁移入口
 
 ### 对已有采样求解增量恢复示例设计
@@ -123,7 +140,9 @@ python Tools/FaceMigration/migrate.py run verify_sampled_face_design.py --job se
 
 下表记录 Seven 既有完整图迁移实现，历史实测环境为 UE 5.8.4 / CL 58902052。源为用户指定的旧 Blueprint，脚本默认目标为 `/Game/_MyTest/Mouth/TMp/NewControlRigRuntimeAsset`，使用独立任务配置适配实际输出路径。优先用 `python Tools/FaceMigration/migrate.py run <脚本.py> --job <新任务>`。这组脚本可作为复用实现入口，但已有内容的目标不能直接执行空目标构建器；应先比较并选择增量修复，或在用户指定的独立空目标上迁移。2026-11-10 已在空壳 `/Game/_MyTest/Mouth/TMp/NewControlRigRuntimeAsset1` 上重跑成功：149 骨、72 动画控制 + 1 Visual Cue、28 曲线、1926 节点、2639 连接，`asset_overrides` 把默认目标键映射到 `...Asset1` 即可，脚本无需改动。构建期间 UE 主线程约 6 分钟无响应（`Responding=False`），属大图文本导入的已知行为，不要重复提交构建或并发连接第二个 UE 任务。
 
-`build_runtime_face_controls.py` 已包含层级复制、`shape_libraries` 等属性复制及节点导入；仍须读取并检查绘制指令、轨道、参考图和材质依赖是否全部覆盖，不能把“完整图”理解为所有视觉依赖自然齐全。函数库、不同骨架和资产版本也需另行适配。
+`build_runtime_face_controls.py` 包含层级（含 Null）复制、`shape_libraries` 等属性复制、成员变量迁移及节点导入。成员存储必须先于图导入创建，结构体使用 `cpp_type_object` 的完整路径，保留类型、默认值和 public/private；暴露给 Spawn/Cinematics 的变量暂不支持，遇到会停止。仍须检查绘制、轨道、参考图和材质依赖，函数库、不同骨架和资产版本需另行适配。
+
+绑定等价判定必须使用引擎原始精度；不能先把变换舍入六位再与 `1e-6` 门限比较。本轮实测原始四元数差约 `5.96e-8`，舍入后会成为 `1.00000000003e-6`，错误进入重新绑定路线。
 
 **路径配置注意：** 源和目标必须保持不同，整图构建器会断言拒绝两者相同。`Jobs/seven-runtime.json` 是旧部位脚本的合并路径适配配置，其中将示例路径映射到目标，不能直接用于这组整图构建与对照。另建任务，仅对实际输出路径及所需依赖作映射，保持示例只读。`--dry-run` 只检查配置和命令，不会验证 UE 目标是否为空。
 

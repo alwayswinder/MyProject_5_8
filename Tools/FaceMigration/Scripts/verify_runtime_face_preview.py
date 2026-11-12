@@ -57,6 +57,23 @@ class RuntimeFaceFrameValidation:
             self.cases.append((str(ck.name), {str(ck.name): values}))
             mixed[str(ck.name)] = values
         assert len(self.cases) == 73
+        validation = _preview_job.get('validation', {})
+        self.head = (unreal.RigElementKey(type=unreal.RigElementType.BONE, name=validation['head_bone'])
+                     if validation.get('head_bone') else None)
+        self.saved_head = self.h.get_global_transform(self.head) if self.head else None
+        self.head_poses = {}
+        if self.head and PREVIEW_HOST == 'pie':
+            for label, delta, rotation in (('head_turn', (30,-20,12), (15,35,8)),
+                                            ('head_opposite', (-15,5,-10), (-25,-50,30))):
+                transform = unreal.Transform()
+                transform.translation = self.saved_head.translation + unreal.Vector(*delta)
+                transform.rotation = unreal.Rotator(*rotation).quaternion() * self.saved_head.rotation
+                transform.scale3d = self.saved_head.scale3d
+                for suffix, values in (('neutral', {}), ('single', self.cases[1][1]),
+                                        ('combined', mixed)):
+                    name = label+'/'+suffix
+                    self.head_poses[name] = transform
+                    self.cases.append((name,values))
         self.cases.extend([('combined', mixed), ('restored', self.saved)])
         self.index = 0
         self.frames = 0
@@ -104,6 +121,10 @@ class RuntimeFaceFrameValidation:
         return math.degrees(2*math.acos(min(1, max(0, dot))))
 
     def begin_case(self):
+        if self.head:
+            pose = self.head_poses.get(self.cases[self.index][0], self.saved_head)
+            self.h.set_global_transform(self.head, pose, False, True)
+            self.th.set_global_transform(self.head, pose, False, True)
         self.set_values(self.h, self.cases[self.index][1])
         self.set_values(self.th, self.cases[self.index][1])
         assert self.temp.execute('Forwards Solve')
@@ -121,7 +142,8 @@ class RuntimeFaceFrameValidation:
             return
         try:
             row = dict(case=self.cases[self.index][0], inputs=self.cases[self.index][1], position_cm=0.0, rotation_deg=0.0, scale=0.0, curve=0.0,
-                       rig_position_cm=0.0, rig_rotation_deg=0.0, time_advanced=self.live.get_absolute_time() > self.time_before)
+                       rig_position_cm=0.0, rig_rotation_deg=0.0, ui_position_cm=0.0, ui_rotation_deg=0.0,
+                       time_advanced=self.live.get_absolute_time() > self.time_before)
             for bk in self.th.get_bones():
                 expected = self.th.get_global_transform(bk)
                 actual = self.comp.get_socket_transform(bk.name, unreal.RelativeTransformSpace.RTS_COMPONENT)
@@ -134,8 +156,16 @@ class RuntimeFaceFrameValidation:
             for ck in self.th.get_curves():
                 expected = self.th.get_curve_value(ck)
                 row['curve'] = max(row['curve'], abs(self.comp.get_anim_instance().get_curve_value(ck.name)-expected))
+            for ck in self.th.get_controls():
+                for fn in ('get_global_transform','get_global_control_shape_transform'):
+                    expected = getattr(self.th,fn)(ck)
+                    actual = getattr(self.h,fn)(ck)
+                    row['ui_position_cm'] = max(row['ui_position_cm'],(actual.translation-expected.translation).length())
+                    row['ui_rotation_deg'] = max(row['ui_rotation_deg'],self.qerror(actual.rotation,expected.rotation))
             t = self.result['tolerance']
-            row['passed'] = row['time_advanced'] and all(row[k] <= v for k, v in t.items()) and row['rig_position_cm'] <= t['position_cm'] and row['rig_rotation_deg'] <= t['rotation_deg']
+            row['passed'] = (row['time_advanced'] and all(row[k] <= v for k, v in t.items())
+                             and max(row['rig_position_cm'],row['ui_position_cm']) <= t['position_cm']
+                             and max(row['rig_rotation_deg'],row['ui_rotation_deg']) <= t['rotation_deg'])
             self.rows.append(row)
             self.index += 1
             if self.index < len(self.cases):
@@ -156,9 +186,17 @@ class RuntimeFaceFrameValidation:
                               rig_clock_advancing=all(r['time_advanced'] for r in self.rows),
                               result=worst, restored_input_error=self.result['restored_input_error'],
                               captured_at=self.result['captured_at'])
+                report['head_space_cases'] = len(self.head_poses)
+                report['head_space_normal_frame_passed'] = (all(r['passed'] for r in self.rows if r['case'] in self.head_poses)
+                                                            if self.head_poses else None)
+                report['animation_sequence_host_tested'] = False
+                report['sequencer_tested'] = False
+                report['head_input_method'] = 'live Rig hierarchy; reference-pose AnimBP with transfer_input_pose=False'
                 (runtime_path('Evidence') / 'pie_preview_check.json').write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding='utf-8')
                 self.cleanup_owned_pie()
         except Exception:
+            if self.head:
+                self.h.set_global_transform(self.head,self.saved_head,False,True)
             self.set_values(self.h, self.saved)
             self.live.execute('Forwards Solve')
             unreal.unregister_slate_post_tick_callback(self.handle)
@@ -169,4 +207,4 @@ class RuntimeFaceFrameValidation:
 
 _runtime_face_frame_validation = RuntimeFaceFrameValidation()
 _runtime_face_frame_validation.start()
-print('Scheduled 75 normal-frame preview cases')
+print('Scheduled ' + str(len(_runtime_face_frame_validation.cases)) + ' normal-frame preview cases')

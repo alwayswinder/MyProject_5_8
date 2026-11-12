@@ -115,7 +115,8 @@
 | 骨骼名映射      | （留空 = 与 Seven 同名） | 格式 `Max骨名=UE骨名`，每行一个                    |
 | Morph 通道映射 | （留空 = 按名称匹配）      | 新角色 Morpher 通道顺序不同时填                    |
 | 形状库依赖      | 默认继承示例            | 项目内 `SL_PhonemeReference` 缺失时口型图会退回默认形状 |
-| 头部骨        | `head`            | 面部手柄与滑轨随头运动                             |
+| 头部骨        | `head001`         | Seven 当前实际锚点；新角色填写实测名称，用于求解动画空间与控制显示跟随 |
+| 身体测试动画    | `/Game/_MyTest/Mouth/Mesh/5秒台词测试_不带口型_Anim` | 用于独立实例的五个动画时刻验证；其他角色填写自身动画，不代表 Sequencer 验收 |
 
 ## 4. 提交前的自检
 
@@ -131,12 +132,14 @@
    - `Characters/<角色名>/face-controls.json`：以本表第 2 节生成 `bindings[]`（`role_id`、`group`、`label`、`side`、`ue_control`、`max_name`、`enabled`），`source`/`target`/`reference` 取自第 1 节。
    - `Jobs/<角色名>-<日期>.json`：`job_id` 独立，`character` 用第 1 节角色名，`asset_overrides` 至少包含
      `"/Game/_MyTest/Mouth/TMp/NewControlRigRuntimeAsset": "<第 1 节目标 CR>"`；目标不同就用新 job，不复用旧结果。
+   - 将第 3 节头部骨和身体测试动画写入任务的 `validation.head_bone`、`validation.animation`；没有动画时须明确记录实际动画未测，不能用参考姿势通过代替。
 3. **改采样脚本**：把下列文件里硬编码的 Max 对象名替换成第 2 节的值（骨骼名在第 3 节）。
    `probe_lip_samples.ms`、`probe_cheek_samples.ms`、`probe_mouth_samples.ms`、`probe_nose_samples.ms`、`probe_nose_side_samples.ms`、`probe_chin_samples.ms`、`probe_eyeball_samples.ms`、`probe_gaze_master_samples.ms`、`probe_xyp_samples.ms`、`probe_expression_sliders.ms`、`probe_phoneme_sliders.ms`、`probe_eye_expression_sliders.ms`，眉毛与上眼皮另改 `probe_animcraft_*.ms`、`probe_syp*.ms` 里的对象名与骨骼名。
    这些脚本目前不读 `face-controls.json`，所以必须同步改；改完先用 `-DryRun` 检查将发送的代码。
 4. **探测与判定**：按 [Build.md](Docs/Workflow/Build.md) 第 1~3 节执行：独立探测目标骨架/网格/Morph，写 `reference_inventory.json`、`adaptation_report.json`；判定“等价核对”还是“重新绑定”。
 5. **构建与验证**：空目标用 `build_runtime_face_controls.py`，非空走增量；随后 `verify_runtime_face_controls.py`、保存重载、正常帧预览。滑块手柄须比滑轨向前浮起 1 cm（Seven：Initial/Current shape 局部 +Y=1），并关闭原置顶调试轨道，改用不透明、正常深度测试的实体 Visual Cue（线宽 0.12 cm，新增 `VIS_SLIDER_RAILS`，动画接口不变）。沿用示例时同样应用，不能改控制 offset 或输入值；共用 `slider_handle_layout.py` 的 `apply_slider_layout()`，已有目标用 `update_slider_handle_depth.py`，生成依赖 `<目标 Rig 包名>_UI/` 随 Rig 迁移。报告写到 `Saved/FaceMigration/Jobs/<job_id>/Current/Evidence/`；原始采样与回归快照写到 `Saved/FaceMigration/Characters/<角色>/`，不要写回工具包。
-6. **交付说明**：列出实际目标、已迁移功能、与示例的有意差异、通过项、未通过项（尤其预览与用户画面）、问题清单 `flow_findings.md`。
+   动画相关必须按[两项必查](Docs/Workflow/Build.md#动画头部空间与控制器跟随两项必查)分别处理：① 面部求解保留输入动画的头部 Transform；② 控制器、滑轨与参考图随头部平移旋转。盘点并迁移私有缓存变量、Null 和头部绑定；保存前、重载后及实际动画帧独立验证，Sequencer 未测须注明。已有空间实现不重复包装；只检查默认姿势、或只复制节点/控制设置均不够。当前通用脚本的覆盖边界见主流程，不能用旧报告代替新目标验证。
+6. **交付说明**：列出实际目标、已迁移功能、与示例的有意差异、通过项、未通过项（尤其预览与用户画面）、“动画头部空间”与“控制器头部跟随”两项独立结论，以及问题清单 `flow_findings.md`。
 7. **边界**：示例资产只读；`previous_controls.json` 只对旧求解谱系有效，空目标新建时不作为门禁；不一致的名称必须报错，不允许静默回退到 Seven 的名字。
 
 口型图布局默认仅在滑轨后方 **1 cm**，不继承旧版 6 cm 的大间距。Seven 为图形 Y=17、轨道 Y=18、手柄中心 Y=19；共用布局与参考图生成器通过 shape translation 调整，保留原 offset、X/Z、大小和逐行对齐。

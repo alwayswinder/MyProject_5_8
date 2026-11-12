@@ -1,5 +1,37 @@
 # Seven 面部迁移状态
 
+## 2026-11-12 新建 RuntimeAsset 全流程验证（当前目标）
+
+用户再次新建 `/Game/_MyTest/Mouth/TMp/NewControlRigRuntimeAsset`，本轮初始为 149 骨、87 曲线、0 控制、1 节点。按 TASK.md 用独立任务 [seven-taskflow-20261112.json](../../Jobs/seven-taskflow-20261112.json) 执行八个固定入口，没有读取旧任务的通过报告。骨架名称/顺序、参考姿势、同一网格及 Morph 独立探测等价，故继承当前示例设计与数值，不重复拟合；当前 Max 重新核对全部 72 个对象名并抽检右上眼皮五点，其余控制没有重新采集 Max。
+
+已保存并重载的目标为 72 动画控制 + 2 Visual Cue、149 骨、28 曲线、1927 节点 / 2645 连接。私有 `FACE_AnimatedHead` 的 Transform 类型、默认值、public/private 与 `head001 → FACE_SPACE` 一并迁移。保存前/重载后各 1175 组迁移对照 worst 全 0，显示契约 0 差异，各 592 组空间检查通过（74 组输入 × 参考、两方向头部运动、身体动画五个时刻）；控制和形状跟随最大位置误差约 `0.000012 cm`，输入头部保持且重复求解不累加。
+
+本轮 Max 主骨 Bone028 最大误差 `0.00343985 cm / 0.00059242°`；次级 Bone027 为 `0.0208485 cm / 0.39335415°`，单列保留。源输入与 Morpher 全部恢复。PIE 28 条 Morph 检查和 81 组正常帧检查通过：72 单控、六组非零头部姿态、组合与恢复，最终曲线误差 0；临时 Actor 已销毁，PIE 已结束，用户关卡未保存。非零头部姿态通过直接写实际 Rig 层级注入，宿主仍为参考姿势 AnimBP，不能当作身体动画播放宿主或 Sequencer 验收。
+
+本轮修复：原始精度绑定判定、成员变量先于节点导入、两项动画空间的保存前/重载后门禁。已知未修复：资产编辑器预览仍停在 0.4 秒，half_error=0.50014，刷新一次无效，输入恢复通过；UE 5.8.4 无条件赋予变量 `CPF_Interp`，Cinematics 标记从 false 变 true，分类 Default 变空，缓存仍 private=true/public=false，数值执行通过。实际动画宿主、Sequencer、最终画面与拾取待验收，不写整体通过。完整报告、问题清单和备份在本任务 `Current/`，示例磁盘摘要保持 `c06af7b84a4f7b636202bed3b0ae1e7f1226b9d23438c81de535ad1a12890804`。以下示例修复和旧目标记录仍为各自日期的历史。
+
+## 2026-11-12 示例 CR 控制器头部跟随
+
+用户明确授权在 `/Game/_MyTest/Mouth/LidDiagnostic/CR_Seven_LidWorldRotation` 增加 `head001 → FACE_SPACE`（Null）。原来直接挂 Root 的 72 个顶层控制改挂 FACE_SPACE，两个单眼控制继续挂眼球总控；合计仍为 72 动画控制 + 2 Visual Cue，149 骨 / 28 曲线 / 1927 节点 / 2645 连接。形状、颜色、操作轴、行程、Initial/Current 输入、眼球子层级及完整图保持。手柄、实体滑轨和口型图均随头运动；这不包含跟随眉毛/嘴唇变形的皮肤贴附或逆向解算。
+
+共用实现为 [face_design_space.py](../../Scripts/face_design_space.py) 的 `attach_face_control_space()`，安装与验证入口为 [update_face_control_space.py](../../Scripts/update_face_control_space.py)，配置为 [seven-reference-control-space-20261112.json](../../Jobs/seven-reference-control-space-20261112.json)。已有 FACE_SPACE 时拒绝重复安装。修改前备份磁盘、当前内存、层级、图和预览输入；报告与备份放目标项目 `Saved/FaceMigration/Jobs/seven-reference-control-space-20261112/Current/`。
+
+保存前、重载后各 592 组对照通过：74 组输入（中性、72 单控、组合）× 参考姿势、两组头部运动和用户身体动画五个时刻。149 骨和 28 曲线对修改前差异为 0；控制与形状的头部跟随最大位置误差约 `0.000017 cm`，重复求解不累加。当前实际编辑器预览另观察 15 帧，时钟推进、74 控制位置及输入保持检查通过；最终 Sequencer 画面与拾取由用户验收，检查时没有打开的序列。RuntimeAsset 本次未修改。
+
+注意：UE 的重设父级会清理显示名标点，安装器显式恢复完整控制设置。动画验证按 AnimNode 的默认行为传播非骨骼子级；逐骨 `set_global_transform(..., bAffectChildren=False)` 会保世界并改写辅助 Null 的局部值，不能用来模拟动画输入。本次诊断失败已自动回退后修正验证方式，正式通过报告为 `Current/Evidence/control_space_report.json`，实际预览观察为 `live_control_space.json`。
+
+## 2026-11-12 示例 CR 动画头部空间修复
+
+用户明确授权修改 `/Game/_MyTest/Mouth/LidDiagnostic/CR_Seven_LidWorldRotation`。在本次当前图上增加 6 个 `HSPACE_` 节点和私有 Transform 缓存 `FACE_AnimatedHead`：入口保存动画当前 `head001`，将其 Current 全局变换临时设为 Initial 并传播子级；原面部链执行结束后恢复缓存头部并传播子级。原有节点默认值、内部连接、控制输入和布局保留，仅替换 Begin 的第一条连接并追加出口。当前为 1927 节点 / 2645 连接；RuntimeAsset 本次未修改。
+
+共用入口为 [wrap_face_head_space.py](../../Scripts/wrap_face_head_space.py)，任务配置为 [seven-reference-head-space-20261112.json](../../Jobs/seven-reference-head-space-20261112.json)。脚本拒绝重复安装；仅适用于参考 Rig 空间求解、所有输出骨骼都位于头部锚点下的 Blueprint Rig。这里的 Global 是 Rig 空间。
+
+备份、基准和报告位于目标项目 `Saved/FaceMigration/Jobs/seven-reference-head-space-20261112/Current/`。正式 CR 保存前与重载后各通过 148 组检查（中性、72 个单控、组合 × 参考姿态/头部运动），149 骨和 28 曲线对照；另外取用户身体动画五个时刻、五组控制，25 组与独立原求解器加显式头部空间包装的结果一致。重复求解不累加。尚未在用户当前 Sequencer 中做最终画面验收；检查时没有打开的序列。
+
+边界：名为“不带口型”的动画仍包含与参考姿态不同的面部骨骼数值。此修复保留既有 Rig 的面部覆盖语义，仅修正头部跟随；默认控制不会自动还原该动画原有的面部姿态，实测面部位置变化最大约 1.85 cm。需要保留并编辑原面部姿态时，应另行采用输入姿态增量或逆向解算方案。
+
+首次尝试在 `AddMemberVariable` 传入 `FTransform` 简写，触发 UE 5.8 `CPPTypeObject` 断言，未接入新图。现已改为 `/Script/CoreUObject.Transform` 并先在临时 Rig 验证。复制 Blueprint 后须保存重载，刷新其 RigVM 链接缓存后再改图；临时探测资产在验证结束后清理。
+
 本页统一维护当前目标、各组入口和已知边界。**2026-11-10 已按示例增量恢复控制设计**：以 `/Game/_MyTest/Mouth/LidDiagnostic/CR_Seven_LidWorldRotation` 为示例，在保留目标采样求解和头部跟随的基础上，恢复手柄、配色、操作轴/行程、24 条滑轨及口型图，并加入源输入矩阵转换。当前技术检查与显示设置对照通过，最终画面与拾取手感待用户验收。执行方法见[主流程](../../Docs/Workflow/Build.md)；此前从零版本的视觉拒绝记录仍保留，不能改写成已获用户确认。
 
 2026-11-09 的完整图迁移、数值、保存重载和正常帧测试保留为[历史交付记录](Evidence/SevenRuntime/README.md)，不代表当前资产仍是当时版本。历史下眼皮和脸颊画面已获用户确认，也不能替代本次整体验收。
